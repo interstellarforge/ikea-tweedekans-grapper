@@ -12,10 +12,14 @@ LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, searc
 
 Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA_COUNTRY`/`IKEA_LANGUAGE` (nl), `IKEA_CLIENT_ID`, `AUTH_USERNAME` (admin), **`AUTH_PASSWORD` (verplicht, min. 8 tekens; `AUTH_DISABLED=true` zet login uit)**, `NTFY_URL` (optional push, e.g. `https://ntfy.sh/<topic>`). E-mail (SMTP) en ntfy stel je in op `/settings`; het SMTP-wachtwoord wordt met AES-256-GCM versleuteld opgeslagen; de sleutel staat in `data/secret.key` (0600) of in `SECRET_KEY` (64 hex-tekens).
 
-## Linux service
+## Linux service (systemd)
 
-Copy to `/opt/ikea-tweedekans-grapper`, `pnpm install --prod=false`, then install `deploy/ikea-tweedekans.service`
-to `/etc/systemd/system/`, `systemctl enable --now ikea-tweedekans`.
+    sudo ./deploy/install.sh
+
+Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, installeert de dependency, maakt gebruiker `ikea`,
+`/etc/ikea-tweedekans.env` (met gegenereerd wachtwoord en sleutel), de systemd-unit, en start de service.
+Opnieuw uitvoeren = updaten (config en data blijven). Verwijderen: `sudo ./deploy/install.sh --uninstall`.
+Vereist Node.js >= 22.18 en npm. Logs: `journalctl -u ikea-tweedekans -f`.
 
 ## Pages
 
