@@ -6,20 +6,30 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "start": "node src/main.ts",
-    "dev": "node --watch src/main.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "format": "prettier --check .",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "test": "vitest run"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@eslint-react/eslint-plugin": "5.26.5",
     "@eslint/js": "9.39.5",
+    "@next/eslint-plugin-next": "16.4.0",
+    "@tsconfig/next": "2.0.6",
     "@tsconfig/node22": "22.0.6",
     "@tsconfig/strictest": "2.0.8",
+    "@types/better-sqlite3": "9.6.0",
     "@types/node": "^22.20.5",
     "@types/nodemailer": "8.0.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitest/eslint-plugin": "1.6.27",
     "eslint": "9.39.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-simple-import-sort": "14.0.0",
     "prettier": "3.9.10",
     "typescript": "5.9.3",
@@ -27,6 +37,11 @@
     "vitest": "5.0.4"
   },
   "dependencies": {
-    "nodemailer": "10.0.10"
+    "better-sqlite3": "13.0.3",
+    "next": "16.4.0",
+    "nodemailer": "10.0.10",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.7"
   }
 }

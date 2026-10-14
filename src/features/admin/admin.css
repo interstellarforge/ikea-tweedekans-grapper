@@ -1,0 +1,76 @@
+.admin-page .role {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+}
+.admin-page .role.admin {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.admin-page .role.off {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.admin-page .stat-group h2 {
+  font-size: 16px;
+  margin: 22px 0 10px;
+}
+.admin-page .stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+.admin-page .stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: grid;
+  gap: 2px;
+}
+.admin-page .stat strong {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.admin-page .stat > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.admin-page .stat-pub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.admin-page td .actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.admin-page .user-card {
+  display: none;
+}
+@media (max-width: 720px) {
+  .admin-page table.users {
+    display: none;
+  }
+  .admin-page .user-card {
+    display: block;
+    border-top: 1px solid var(--line);
+    padding: 12px 0;
+  }
+  .admin-page .user-card:first-child {
+    border-top: 0;
+  }
+  .admin-page .user-card .actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+}

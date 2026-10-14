@@ -1,0 +1,14 @@
+.catalog-page .starter h2 {
+  font-size: 18px;
+  margin: 8px 0 4px;
+}
+.catalog-page .starter-group {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.catalog-page .starter-group h3 {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 8px;
+  font-weight: 600;
+}

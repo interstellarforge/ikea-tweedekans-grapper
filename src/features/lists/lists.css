@@ -1,0 +1,224 @@
+/* watchlist cards */
+.lists-page .wcard {
+  position: relative;
+}
+.lists-page .wcard .corner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.lists-page .wcard .need {
+  font-weight: 700;
+}
+.lists-page .stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.lists-page .stepper button {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.lists-page .stepper strong {
+  min-width: 24px;
+  text-align: center;
+}
+/* shopping lists */
+.lists-page .bon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 18px;
+}
+.lists-page .bon .k {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lists-page .bon .v {
+  font-size: 20px;
+  font-weight: 800;
+}
+.lists-page .bon .v.good {
+  color: var(--good);
+}
+.lists-page .progress {
+  height: 10px;
+  background: var(--neutral-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+.lists-page .progress > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+  transition: width 0.25s;
+}
+.lists-page .line {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 6px 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.lists-page .line:first-child {
+  border-top: 0;
+}
+.lists-page .line img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--neutral-bg);
+}
+.lists-page .line.done {
+  opacity: 0.6;
+}
+.lists-page .line .ltitle {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+.lists-page .line.done .ltitle {
+  text-decoration: line-through;
+}
+.lists-page .line .price {
+  text-align: right;
+  white-space: nowrap;
+}
+.lists-page .line .price .total {
+  font-weight: 800;
+  font-size: 17px;
+}
+.lists-page .line .price small {
+  display: block;
+  color: var(--muted);
+}
+.lists-page .line .mini-bar {
+  height: 6px;
+  width: 140px;
+  background: var(--neutral-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+.lists-page .line .mini-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+.lists-page .line .tools {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.lists-page .purch {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lists-page .purch div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.lists-page .purch button {
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.lists-page .purch button svg {
+  width: 13px;
+  height: 13px;
+}
+.lists-page .listbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.lists-page .listbar h2 {
+  margin: 0;
+  margin-right: auto;
+}
+.lists-page .pieces {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+}
+.lists-page .imp {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.lists-page .imp:first-child {
+  border-top: 0;
+}
+.lists-page .imp .top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.lists-page .bar {
+  height: 6px;
+  background: var(--neutral-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.lists-page .bar > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--brand);
+  transition: width 0.3s;
+}
+.lists-page .bar.running > span {
+  width: 70%;
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+.lists-page .bar.ok > span {
+  width: 100%;
+  background: var(--good);
+}
+.lists-page .bar.warn > span {
+  width: 100%;
+  background: var(--warn);
+}
+.lists-page .bar.err > span {
+  width: 100%;
+  background: var(--bad);
+}
+@keyframes pulse {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 640px) {
+  .lists-page .line {
+    grid-template-columns: 52px 1fr;
+  }
+  .lists-page .line img {
+    width: 52px;
+    height: 52px;
+  }
+  .lists-page .line .price {
+    grid-column: 2;
+    text-align: left;
+  }
+}

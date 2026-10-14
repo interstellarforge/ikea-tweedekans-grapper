@@ -1,12 +1,22 @@
 {
   "extends": [
-    "@tsconfig/node22/tsconfig.json",
+    "@tsconfig/next/tsconfig.json",
     "@tsconfig/strictest/tsconfig.json"
   ],
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "rewriteRelativeImportExtensions": false
+    "target": "ES2023",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "paths": { "@/*": ["./src/*"] },
+    "plugins": [{ "name": "next" }]
   },
-  "include": ["src", "eslint.config.js"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
 }

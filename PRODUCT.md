@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Existing codebase: plain HTML/CSS/vanilla JS pages in `src/ui`, served by a dependency-free Node server (`src/server.ts`). No framework or build step; keep it that way unless the user decides otherwise.
+Next.js 16 (App Router) + React 19 + TypeScript, SQLite via better-sqlite3. Domain logic in `src/server`, JSON API in `src/app/api` (also meant for a future mobile app), UI in `src/features` and `src/components`. Styling: the existing design system in `src/app/globals.css` plus per-feature stylesheets.
 
 ## Users
 
