@@ -31,4 +31,27 @@ test("smtp password is stored, kept on empty update and never exposed", () => {
   expect(saveSettings(db, { email: { to: "not-an-address" } })).toMatch(
     /Ongeldig/,
   );
+  // Home Assistant token is encrypted too and never exposed
+  expect(
+    saveSettings(db, {
+      homeAssistant: {
+        baseUrl: "http://ha.local:8123/",
+        token: "tok",
+        targets: ["mobile_app_x"],
+      },
+    }),
+  ).toBeUndefined();
+  expect(getSettings(db).homeAssistant).toMatchObject({
+    baseUrl: "http://ha.local:8123",
+    token: "tok",
+    targets: ["mobile_app_x"],
+  });
+  const ha = db
+    .prepare("SELECT value FROM settings WHERE key = 'ha.token'")
+    .get() as { value: string };
+  expect(ha.value).not.toContain("tok");
+  expect(toPublic(getSettings(db)).homeAssistant).not.toHaveProperty("token");
+  expect(
+    saveSettings(db, { homeAssistant: { targets: ["bad name!"] } }),
+  ).toMatch(/Ongeldige/);
 });

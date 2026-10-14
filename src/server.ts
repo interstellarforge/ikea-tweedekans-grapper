@@ -28,7 +28,13 @@ import {
   fetchStores,
   searchCatalog,
 } from "./ikea-client.ts";
-import { alertLinks, sendEmail, sendNtfy } from "./notify.ts";
+import {
+  alertLinks,
+  listHaNotifyTargets,
+  sendEmail,
+  sendHa,
+  sendNtfy,
+} from "./notify.ts";
 import { pollAll, pollStatus } from "./poller.ts";
 import {
   getSettings,
@@ -264,13 +270,31 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
           if (typeof m[k] === "string") input.email[k] = m[k];
         }
       }
+      const h = body["homeAssistant"];
+      if (typeof h === "object" && h !== null) {
+        const m = h as Record<string, unknown>;
+        input.homeAssistant = {};
+        if (typeof m["enabled"] === "boolean") {
+          input.homeAssistant.enabled = m["enabled"];
+        }
+        if (typeof m["baseUrl"] === "string") {
+          input.homeAssistant.baseUrl = m["baseUrl"];
+        }
+        if (typeof m["token"] === "string")
+          input.homeAssistant.token = m["token"];
+        if (Array.isArray(m["targets"])) {
+          input.homeAssistant.targets = m["targets"].filter(
+            (t): t is string => typeof t === "string",
+          );
+        }
+      }
       const error = saveSettings(db, input);
       if (error) send(res, 400, { error });
       else send(res, 200, toPublic(getSettings(db)));
       return;
     }
 
-    const testMatch = /^\/api\/notify\/test\/(email|ntfy)$/.exec(path);
+    const testMatch = /^\/api\/notify\/test\/(email|ntfy|ha)$/.exec(path);
     if (method === "POST" && testMatch?.[1]) {
       const settings = getSettings(db);
       try {
@@ -279,6 +303,13 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
             settings.email,
             "Tweedekans: testmelding",
             "Dit is een testmelding van IKEA Tweedekans. E-mail werkt.",
+          );
+        } else if (testMatch[1] === "ha") {
+          await sendHa(
+            settings.homeAssistant,
+            "Tweedekans: testmelding",
+            "Home Assistant werkt.",
+            alertLinks(settings.appUrl),
           );
         } else {
           if (!settings.ntfyUrl) throw new Error("Geen ntfy-URL ingesteld");
@@ -293,6 +324,27 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       } catch (error) {
         send(res, 400, {
           error: error instanceof Error ? error.message : "versturen mislukt",
+        });
+      }
+      return;
+    }
+
+    if (method === "POST" && path === "/api/ha/targets") {
+      const body = await readJson(req);
+      const stored = getSettings(db).homeAssistant;
+      const baseUrl = (str(body["baseUrl"]) || stored.baseUrl).replace(
+        /\/+$/,
+        "",
+      );
+      const token = str(body["token"]) || stored.token;
+      try {
+        send(res, 200, { targets: await listHaNotifyTargets(baseUrl, token) });
+      } catch (error) {
+        send(res, 400, {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Verbinding met Home Assistant mislukt",
         });
       }
       return;

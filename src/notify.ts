@@ -4,7 +4,11 @@ import nodemailer from "nodemailer";
 
 import { config } from "./config.ts";
 import type { PriceTag } from "./insights.ts";
-import { type EmailSettings, getSettings } from "./settings.ts";
+import {
+  type EmailSettings,
+  getSettings,
+  type HomeAssistantSettings,
+} from "./settings.ts";
 import type { Alert } from "./watchlist.ts";
 
 const OFFERS_URL = `https://www.ikea.com/${config.country}/${config.language}/second-hand/buy-from-ikea/`;
@@ -124,12 +128,95 @@ export async function sendEmail(
   });
 }
 
+async function haRequest<T>(
+  baseUrl: string,
+  token: string,
+  path: string,
+  init?: { method: "POST"; body: unknown },
+): Promise<T> {
+  if (!baseUrl || !token)
+    throw new Error("Home Assistant-URL en token zijn verplicht");
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: init?.method ?? "GET",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    ...(init ? { body: JSON.stringify(init.body) } : {}),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (res.status === 401)
+    throw new Error("Home Assistant: token ongeldig (401)");
+  if (!res.ok)
+    throw new Error(`Home Assistant antwoordde ${String(res.status)}`);
+  return (await res.json()) as T;
+}
+
+/** Notify services available in Home Assistant (mobile apps etc.), without the "notify." prefix. */
+export async function listHaNotifyTargets(
+  baseUrl: string,
+  token: string,
+): Promise<string[]> {
+  const domains = await haRequest<
+    { domain: string; services: Record<string, unknown> }[]
+  >(baseUrl, token, "/api/services");
+  const notify = domains.find((d) => d.domain === "notify");
+  const generic = new Set([
+    "notify",
+    "send_message",
+    "persistent_notification",
+  ]);
+  return Object.keys(notify?.services ?? {})
+    .filter((name) => !generic.has(name))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export async function sendHa(
+  cfg: HomeAssistantSettings,
+  title: string,
+  message: string,
+  links: NtfyLinks,
+): Promise<void> {
+  if (cfg.targets.length === 0)
+    throw new Error("Geen Home Assistant-ontvangers gekozen");
+  // Companion app: `url` (iOS) / `clickAction` (Android) open on tap; URI actions add buttons.
+  const data = {
+    url: links.click,
+    clickAction: links.click,
+    ...(links.actions.length
+      ? {
+          actions: links.actions.map((a) => ({
+            action: "URI",
+            title: a.label,
+            uri: a.url,
+          })),
+        }
+      : {}),
+  };
+  const results = await Promise.allSettled(
+    cfg.targets.map((target) =>
+      haRequest(cfg.baseUrl, cfg.token, `/api/services/notify/${target}`, {
+        method: "POST",
+        body: { title, message, data },
+      }),
+    ),
+  );
+  const failed = results.flatMap((r, i) =>
+    r.status === "rejected"
+      ? [
+          `${cfg.targets[i] ?? "?"}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+        ]
+      : [],
+  );
+  if (failed.length) throw new Error(failed.join("; "));
+}
+
 /** Sends an alert over every enabled channel; returns a per-channel result summary. */
 export async function notifyAlert(
   db: DatabaseSync,
   alert: Alert,
 ): Promise<string> {
-  const { ntfyUrl, email, appUrl } = getSettings(db);
+  const { ntfyUrl, email, appUrl, homeAssistant } = getSettings(db);
   const links = alertLinks(appUrl, alert);
   const body = `${alert.description} voor ${euro(alert.price)}${alert.note ? ` — ${alert.note}` : ""}`;
   const jobs: [string, Promise<void>][] = [];
@@ -147,6 +234,12 @@ export async function notifyAlert(
         `Tweedekans: ${headline(alert)}`,
         `${headline(alert)}\n\n${body}\nArtikel ${alert.articleNumber} · aanbieding ${alert.offerNumber}\n\nBekijk bij IKEA: ${links.click}${appUrl ? `\nProduct in de app: ${appUrl}/product/${alert.articleNumber}\nAlle meldingen: ${appUrl}/alerts` : ""}\n`,
       ),
+    ]);
+  }
+  if (homeAssistant.enabled) {
+    jobs.push([
+      "home assistant",
+      sendHa(homeAssistant, `Tweedekans: ${headline(alert)}`, body, links),
     ]);
   }
   if (jobs.length === 0) return "geen kanaal ingesteld";

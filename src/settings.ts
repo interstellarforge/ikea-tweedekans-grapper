@@ -15,6 +15,16 @@ export type EmailSettings = {
   to: string;
 };
 
+export type HomeAssistantSettings = {
+  enabled: boolean;
+  /** Base URL, e.g. http://homeassistant.local:8123 (no trailing slash). */
+  baseUrl: string;
+  /** Long-lived access token. */
+  token: string;
+  /** notify service names without the "notify." prefix, e.g. mobile_app_keess_iphone. */
+  targets: string[];
+};
+
 export type Settings = {
   pollIntervalMin: number;
   ntfyUrl: string;
@@ -27,11 +37,13 @@ export type Settings = {
   /** Car consumption in litres per 100 km. */
   consumptionPer100km: number;
   email: EmailSettings;
+  homeAssistant: HomeAssistantSettings;
 };
 
 /** Settings as sent to the browser: the SMTP password is never returned. */
-export type PublicSettings = Omit<Settings, "email"> & {
+export type PublicSettings = Omit<Settings, "email" | "homeAssistant"> & {
   email: Omit<EmailSettings, "password"> & { passwordSet: boolean };
+  homeAssistant: Omit<HomeAssistantSettings, "token"> & { tokenSet: boolean };
 };
 
 export type SettingsInput = {
@@ -42,6 +54,7 @@ export type SettingsInput = {
   fuelPrice?: number;
   consumptionPer100km?: number;
   email?: Partial<EmailSettings>;
+  homeAssistant?: Partial<HomeAssistantSettings>;
 };
 
 const defaults = (): Settings => ({
@@ -61,6 +74,7 @@ const defaults = (): Settings => ({
     from: "",
     to: "",
   },
+  homeAssistant: { enabled: false, baseUrl: "", token: "", targets: [] },
 });
 
 export function getSettings(db: DatabaseSync): Settings {
@@ -95,12 +109,34 @@ export function getSettings(db: DatabaseSync): Settings {
       from: map.get("email.from") ?? d.email.from,
       to: map.get("email.to") ?? d.email.to,
     },
+    homeAssistant: {
+      enabled: map.get("ha.enabled") === "1",
+      baseUrl: map.get("ha.baseUrl") ?? d.homeAssistant.baseUrl,
+      token: decryptSecret(map.get("ha.token") ?? ""),
+      targets: parseTargets(map.get("ha.targets")),
+    },
   };
+}
+
+function parseTargets(raw: string | undefined): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((t): t is string => typeof t === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function toPublic(s: Settings): PublicSettings {
   const { password, ...email } = s.email;
-  return { ...s, email: { ...email, passwordSet: password !== "" } };
+  const { token, ...homeAssistant } = s.homeAssistant;
+  return {
+    ...s,
+    email: { ...email, passwordSet: password !== "" },
+    homeAssistant: { ...homeAssistant, tokenSet: token !== "" },
+  };
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -190,6 +226,27 @@ export function saveSettings(
         : e.password;
       writes.push(["email.password", encryptSecret(pw)]);
     }
+  }
+  const ha = input.homeAssistant;
+  if (ha) {
+    if (ha.baseUrl !== undefined) {
+      const url = ha.baseUrl.trim().replace(/\/+$/, "");
+      if (url && !/^https?:\/\/[^\s/]+(\/\S*)?$/.test(url)) {
+        return "Home Assistant-URL moet er zo uitzien: http://homeassistant.local:8123";
+      }
+      writes.push(["ha.baseUrl", url]);
+    }
+    if (ha.enabled !== undefined) {
+      writes.push(["ha.enabled", ha.enabled ? "1" : "0"]);
+    }
+    if (ha.targets !== undefined) {
+      if (!ha.targets.every((t) => /^[a-z0-9_]+$/.test(t))) {
+        return "Ongeldige Home Assistant-ontvanger";
+      }
+      writes.push(["ha.targets", JSON.stringify(ha.targets)]);
+    }
+    // Empty token = keep the stored one.
+    if (ha.token) writes.push(["ha.token", encryptSecret(ha.token.trim())]);
   }
   db.exec("BEGIN");
   try {

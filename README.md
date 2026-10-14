@@ -23,7 +23,7 @@ Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.
 
 ## Pages
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/trips` (ritje-check per filiaal), `/alerts` (meldingshistorie), `/settings` (gevolgde filialen, interval, ntfy, status).
+`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/trips` (ritje-check per filiaal), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
 
 Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
 Gevolgde filialen bepalen alleen waarvoor meldingen komen.
