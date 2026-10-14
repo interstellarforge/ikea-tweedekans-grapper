@@ -29,3 +29,15 @@ Gevolgde filialen bepalen alleen waarvoor meldingen komen.
 `GET /api/stores`, `PUT /api/stores/:id/followed`, `GET|PUT /api/settings`, `GET /api/status`, `POST /api/sync`,
 `GET /api/catalog?q=`, `GET|PUT /api/watchlist`, `DELETE /api/watchlist/:articleNumber`,
 `GET /api/alerts`, `POST /api/alerts/seen`, `GET /api/offers?q=&store=&followed=&newHours=&sort=&limit=&offset=`
+
+## ntfy (push) op jupiter
+
+`deploy/ntfy/docker-compose.yml` draait een eigen ntfy-server (standaard host-poort 8097, via `NTFY_PORT`).
+
+    cd deploy/ntfy
+    cp .env.example .env   # NTFY_BASE_URL = publieke URL via Nginx Proxy Manager
+    docker compose up -d
+
+Nginx Proxy Manager: Proxy Host met scheme `http`, forward host = jupiter, forward port = `NTFY_PORT`,
+**Websockets Support aan** (nodig voor live meldingen), SSL naar keuze.
+Zet daarna in `/settings` van de app de ntfy-URL op `<NTFY_BASE_URL>/tweedekans` en abonneer de ntfy-app op topic `tweedekans`.
