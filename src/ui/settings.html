@@ -137,9 +137,27 @@
             <input type="number" id="fuelPrice" min="0.5" max="5" step="0.01" />
           </div>
           <div class="field">
+            <label for="maxStops">Max. filialen per rit</label>
+            <select id="maxStops">
+              <option value="1">1 (alleen enkele filialen)</option>
+              <option value="2">2 (rij naar A via B)</option>
+              <option value="3">3 (A via B naar C)</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="consumption">Verbruik (liter per 100 km)</label>
             <input type="number" id="consumption" min="1" max="40" step="0.1" />
           </div>
+        </section>
+        <section class="panel">
+          <h2>Filialen in ritten</h2>
+          <p class="hint">
+            Haal het vinkje weg bij filialen die je nooit wilt bezoeken. Die
+            worden niet meegenomen in de Ritje-check en in combinatieroutes.
+            Wijzigingen worden direct opgeslagen.
+          </p>
+          <div class="stores" id="tripBoxes"></div>
         </section>
       </div>
 
@@ -439,6 +457,7 @@
           homePostcode: $("postcode").value,
           fuelPrice: Number($("fuelPrice").value),
           consumptionPer100km: Number($("consumption").value),
+          maxStops: Number($("maxStops").value),
           email: emailPayload(),
           homeAssistant: {
             enabled: $("haEnabled").checked,
@@ -530,6 +549,22 @@
           return el("label", {}, cb, ` ${s.name}`);
         };
         $("followBoxes").replaceChildren(...stores.map(box));
+        const tripBox = (s) => {
+          const cb = el("input", {
+            type: "checkbox",
+            checked: !s.tripExcluded,
+          });
+          cb.onchange = async () => {
+            await send(`/api/stores/${s.storeId}/trip-excluded`, "PUT", {
+              excluded: !cb.checked,
+            });
+          };
+          return el("label", {}, cb, ` ${s.name}`);
+        };
+        // Only rebuild when not being edited, so a periodic refresh never flips a click.
+        if (!$("tripBoxes").contains(document.activeElement)) {
+          $("tripBoxes").replaceChildren(...stores.map(tripBox));
+        }
 
         const row = (s) =>
           el(
@@ -579,6 +614,7 @@
         $("postcode").value = s.homePostcode;
         $("fuelPrice").value = s.fuelPrice;
         $("consumption").value = s.consumptionPer100km;
+        $("maxStops").value = String(s.maxStops);
         const e = s.email;
         $("mailEnabled").checked = e.enabled;
         $("host").value = e.host;

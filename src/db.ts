@@ -18,6 +18,8 @@ export type StoreRow = {
   storeId: string;
   name: string;
   followed: boolean;
+  /** Left out of trip calculations (too far / not wanted). */
+  tripExcluded: boolean;
   lastSynced: number | undefined;
   lastError: string | undefined;
   activeOffers: number;
@@ -89,6 +91,13 @@ export function openDb(path: string): DatabaseSync {
       source TEXT NOT NULL,
       PRIMARY KEY (postcode, store_id)
     );
+    CREATE TABLE IF NOT EXISTS store_dist (
+      from_store TEXT NOT NULL,
+      to_store TEXT NOT NULL,
+      km REAL NOT NULL,
+      source TEXT NOT NULL,
+      PRIMARY KEY (from_store, to_store)
+    );
     CREATE TABLE IF NOT EXISTS alerts (
       store_id TEXT NOT NULL,
       offer_number TEXT NOT NULL,
@@ -138,6 +147,14 @@ export function openDb(path: string): DatabaseSync {
   if (!alertCols.includes("delivery")) {
     db.exec("ALTER TABLE alerts ADD COLUMN delivery TEXT NOT NULL DEFAULT ''");
   }
+  const storeCols = (
+    db.prepare("PRAGMA table_info(stores)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!storeCols.includes("trip_excluded")) {
+    db.exec(
+      "ALTER TABLE stores ADD COLUMN trip_excluded INTEGER NOT NULL DEFAULT 0",
+    );
+  }
   const watchCols = (
     db.prepare("PRAGMA table_info(watch_items)").all() as { name: string }[]
   ).map((c) => c.name);
@@ -160,7 +177,7 @@ export function upsertStores(db: DatabaseSync, stores: Store[]): void {
 export function listStores(db: DatabaseSync): StoreRow[] {
   const rows = db
     .prepare(
-      `SELECT s.store_id AS storeId, s.name, s.followed, s.last_synced AS lastSynced,
+      `SELECT s.store_id AS storeId, s.name, s.followed, s.trip_excluded AS tripExcluded, s.last_synced AS lastSynced,
               s.last_error AS lastError,
               (SELECT COUNT(*) FROM offers o WHERE o.store_id = s.store_id AND o.active = 1) AS activeOffers
        FROM stores s ORDER BY s.name`,
@@ -169,6 +186,7 @@ export function listStores(db: DatabaseSync): StoreRow[] {
     storeId: string;
     name: string;
     followed: number;
+    tripExcluded: number;
     lastSynced: number | null;
     lastError: string | null;
     activeOffers: number;
@@ -176,6 +194,7 @@ export function listStores(db: DatabaseSync): StoreRow[] {
   return rows.map((r) => ({
     ...r,
     followed: r.followed === 1,
+    tripExcluded: r.tripExcluded === 1,
     lastSynced: r.lastSynced ?? undefined,
     lastError: r.lastError ?? undefined,
   }));
@@ -188,6 +207,17 @@ export function setFollowed(
 ): void {
   db.prepare("UPDATE stores SET followed = ? WHERE store_id = ?").run(
     followed ? 1 : 0,
+    storeId,
+  );
+}
+
+export function setTripExcluded(
+  db: DatabaseSync,
+  storeId: string,
+  excluded: boolean,
+): void {
+  db.prepare("UPDATE stores SET trip_excluded = ? WHERE store_id = ?").run(
+    excluded ? 1 : 0,
     storeId,
   );
 }

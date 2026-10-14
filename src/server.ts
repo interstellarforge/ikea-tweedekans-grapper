@@ -21,6 +21,7 @@ import {
   priceHistory,
   searchOffers,
   setFollowed,
+  setTripExcluded,
   upsertStores,
 } from "./db.ts";
 import {
@@ -236,6 +237,14 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       return;
     }
 
+    const excludeMatch = /^\/api\/stores\/(\d+)\/trip-excluded$/.exec(path);
+    if (method === "PUT" && excludeMatch?.[1]) {
+      const body = await readJson(req);
+      setTripExcluded(db, excludeMatch[1], body["excluded"] === true);
+      send(res, 200, { ok: true });
+      return;
+    }
+
     if (method === "GET" && path === "/api/settings") {
       send(res, 200, toPublic(getSettings(db)));
       return;
@@ -251,6 +260,9 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       if (typeof body["appUrl"] === "string") input.appUrl = body["appUrl"];
       if (typeof body["homePostcode"] === "string") {
         input.homePostcode = body["homePostcode"];
+      }
+      if (typeof body["maxStops"] === "number") {
+        input.maxStops = body["maxStops"];
       }
       if (typeof body["fuelPrice"] === "number") {
         input.fuelPrice = body["fuelPrice"];

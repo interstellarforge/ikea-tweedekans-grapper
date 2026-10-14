@@ -36,6 +36,8 @@ export type Settings = {
   fuelPrice: number;
   /** Car consumption in litres per 100 km. */
   consumptionPer100km: number;
+  /** Maximum number of stores combined in one trip (1-4). */
+  maxStops: number;
   email: EmailSettings;
   homeAssistant: HomeAssistantSettings;
 };
@@ -53,6 +55,7 @@ export type SettingsInput = {
   homePostcode?: string;
   fuelPrice?: number;
   consumptionPer100km?: number;
+  maxStops?: number;
   email?: Partial<EmailSettings>;
   homeAssistant?: Partial<HomeAssistantSettings>;
 };
@@ -64,6 +67,7 @@ const defaults = (): Settings => ({
   homePostcode: "",
   fuelPrice: 2.1,
   consumptionPer100km: 7,
+  maxStops: 3,
   email: {
     enabled: false,
     host: "",
@@ -91,6 +95,9 @@ export function getSettings(db: DatabaseSync): Settings {
     ntfyUrl: map.get("ntfyUrl") ?? d.ntfyUrl,
     appUrl: map.get("appUrl") ?? d.appUrl,
     homePostcode: map.get("homePostcode") ?? d.homePostcode,
+    maxStops: [1, 2, 3, 4].includes(Number(map.get("maxStops")))
+      ? Number(map.get("maxStops"))
+      : d.maxStops,
     fuelPrice:
       Number(map.get("fuelPrice")) > 0
         ? Number(map.get("fuelPrice"))
@@ -178,6 +185,12 @@ export function saveSettings(
       return "Postcode moet er zo uitzien: 1234 AB";
     }
     writes.push(["homePostcode", pc.replace(/\s+/g, "").toUpperCase()]);
+  }
+  if (input.maxStops !== undefined) {
+    if (![1, 2, 3, 4].includes(input.maxStops)) {
+      return "Aantal filialen per rit moet tussen 1 en 4 liggen";
+    }
+    writes.push(["maxStops", String(input.maxStops)]);
   }
   if (input.fuelPrice !== undefined) {
     if (!(input.fuelPrice > 0 && input.fuelPrice < 10)) {

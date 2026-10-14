@@ -13,6 +13,7 @@
         Producten die je in de gaten houdt. Je krijgt een melding zodra ze in de
         tweedekanshoek van een gevolgd filiaal verschijnen.
       </p>
+      <a href="/trips" class="banner-good" id="tripBanner" hidden></a>
       <section class="panel" id="alertPanel" hidden>
         <div class="row">
           <h2 style="margin: 0">Meldingen</h2>
@@ -38,6 +39,37 @@
         chip,
       } = App;
       const refreshShell = initShell("watchlist");
+
+      async function loadTrips() {
+        const banner = $("tripBanner");
+        try {
+          const data = await api("/api/trips");
+          const r = data.configured ? data.bestRoute : undefined;
+          banner.hidden = !r?.worthIt;
+          if (!r?.worthIt) return;
+          const names = r.stops.map((st) => st.storeName);
+          const route =
+            names.length === 1
+              ? `naar ${names[0]}`
+              : names.length === 2
+                ? `naar ${names[0]} via ${names[1]}`
+                : `naar ${names[0]} via ${names.slice(1, -1).join(", ")} naar ${names[names.length - 1]}`;
+          const units = r.stops.reduce(
+            (n, st) => n + st.units.reduce((m, u) => m + u.count, 0),
+            0,
+          );
+          banner.replaceChildren(
+            el("strong", {
+              textContent: `Een ritje ${route} is rendabel: +${money(r.net)} netto`,
+            }),
+            el("span", {
+              textContent: ` · ${r.totalKm} km totaal, ${units} stuks, besparing ${money(r.saving)} min ${money(r.tripCost)} brandstof`,
+            }),
+          );
+        } catch {
+          banner.hidden = true; // trip check is optional; never block the watchlist
+        }
+      }
 
       async function loadAlerts() {
         const unseen = (await api("/api/alerts?limit=200")).items.filter(
@@ -154,10 +186,12 @@
       };
       loadAlerts();
       loadItems();
+      loadTrips();
       setInterval(() => {
         if (document.activeElement?.tagName === "INPUT") return;
         loadAlerts();
         loadItems();
+        loadTrips();
       }, 60000);
     </script>
   </body>

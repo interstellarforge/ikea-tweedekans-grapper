@@ -6,6 +6,9 @@
     <title>Ritje-check · IKEA Tweedekans</title>
     <link rel="stylesheet" href="/assets/app.css" />
     <style>
+      .route.good {
+        border-color: var(--good);
+      }
       #summary {
         margin: 0 0 14px;
       }
@@ -67,6 +70,7 @@
         brandstofkosten van de retour-rit.
       </p>
       <div id="summary" class="hint"></div>
+      <div id="route"></div>
       <div id="trips"></div>
     </main>
     <script src="/assets/app.js"></script>
@@ -140,6 +144,70 @@
         );
       };
 
+      const routePanel = (r, data) => {
+        if (!r || r.stops.length < 2) return null;
+        const names = r.stops.map((s) => s.storeName);
+        const title =
+          names.length === 2
+            ? `Rij naar ${names[0]} via ${names[1]}`
+            : `Rij naar ${names[0]} via ${names.slice(1, -1).join(", ")} naar ${names[names.length - 1]}`;
+        const gain = r.gainOverSingle;
+        return el(
+          "section",
+          { className: `panel trip route ${r.worthIt ? "good" : ""}` },
+          el(
+            "header",
+            {},
+            el("h2", { textContent: `Slimste route: ${title}` }),
+            chip(
+              r.worthIt ? "Rit is de moeite waard" : "Niet de moeite waard",
+              r.worthIt ? "good" : "bad",
+            ),
+            el("span", {
+              className: `net ${r.worthIt ? "good" : "bad"}`,
+              textContent: `${r.net >= 0 ? "+" : "−"}${money(Math.abs(r.net))}`,
+            }),
+          ),
+          el(
+            "div",
+            { className: "facts" },
+            el("span", {
+              textContent: `${r.totalKm} km totaal (thuis → ${names.join(" → ")} → thuis)`,
+            }),
+            el("span", { textContent: `Ritkosten: ${money(r.tripCost)}` }),
+            el("span", { textContent: `Besparing: ${money(r.saving)}` }),
+            el("span", { textContent: `Te betalen: ${money(r.spend)}` }),
+            r.bestSingleName
+              ? el("span", {
+                  textContent:
+                    gain > 0
+                      ? `${money(gain)} beter dan alleen ${r.bestSingleName}`
+                      : `Even goed als alleen ${r.bestSingleName}`,
+                })
+              : null,
+          ),
+          el(
+            "ul",
+            { className: "lines" },
+            ...r.stops.map((s) =>
+              el(
+                "li",
+                {},
+                el("strong", {
+                  className: "name",
+                  textContent: `${s.followed ? "★ " : ""}${s.storeName} (${s.legKm} km)`,
+                }),
+                el(
+                  "span",
+                  {},
+                  s.units.map((u) => `${u.count}× ${u.name}`).join(", "),
+                ),
+              ),
+            ),
+          ),
+        );
+      };
+
       (async () => {
         $("summary").textContent = "Afstanden berekenen…";
         let data;
@@ -171,6 +239,9 @@
         }
         $("summary").textContent =
           `Vanaf ${data.postcode} · benzine ${money(data.fuelPrice)}/l · ${data.consumptionPer100km} l/100 km · ${data.wantedUnits} stuks nodig`;
+        $("route").replaceChildren(
+          ...[routePanel(data.bestRoute, data)].filter(Boolean),
+        );
         $("trips").replaceChildren(...data.stores.map(trip));
       })();
     </script>

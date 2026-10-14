@@ -58,6 +58,13 @@ export type TripResult = {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+const unitSaving = (o: TripOffer): number =>
+  o.originalPrice ? o.originalPrice - o.price : 0;
+
+/** Best units first: biggest saving versus new price, then cheapest. */
+const bySavingThenPrice = (a: TripOffer, b: TripOffer): number =>
+  unitSaving(b) - unitSaving(a) || a.price - b.price;
+
 /**
  * Pure trip evaluation: for every wanted product take the cheapest offers up to the
  * wanted quantity; net = saving versus new price - fuel cost of the round trip.
@@ -74,7 +81,7 @@ export function evaluateTrip(input: {
   );
   const items = input.items.map((item): TripItemResult => {
     const picked = [...item.offers]
-      .sort((a, b) => a.price - b.price)
+      .sort(bySavingThenPrice)
       .slice(0, item.quantity);
     return {
       articleNumber: item.articleNumber,
@@ -182,12 +189,191 @@ async function drivingKm(
   return result;
 }
 
+export type RouteOffer = TripOffer & {
+  storeId: string;
+  articleNumber: string;
+};
+
+export type RouteWant = {
+  articleNumber: string;
+  name: string;
+  quantity: number;
+};
+
+export type RouteStop = {
+  storeId: string;
+  units: {
+    articleNumber: string;
+    name: string;
+    count: number;
+    spend: number;
+    saving: number;
+  }[];
+};
+
+export type RouteResult = {
+  stops: RouteStop[];
+  totalKm: number;
+  tripCost: number;
+  spend: number;
+  saving: number;
+  net: number;
+  worthIt: boolean;
+};
+
+/**
+ * Evaluates visiting `order` (store ids) in sequence. Each wanted product is bought only up to
+ * its quantity, from the best units available among the visited stores. Returns undefined when a
+ * stop would not buy anything (a shorter route would be better then).
+ */
+export function evaluateRoute(input: {
+  order: string[];
+  totalKm: number;
+  fuelPrice: number;
+  consumptionPer100km: number;
+  wants: RouteWant[];
+  offers: RouteOffer[];
+}): RouteResult | undefined {
+  const visited = new Set(input.order);
+  const bought = new Map<string, RouteStop["units"][number]>();
+  for (const want of input.wants) {
+    const picked = input.offers
+      .filter(
+        (o) => o.articleNumber === want.articleNumber && visited.has(o.storeId),
+      )
+      .sort(bySavingThenPrice)
+      .slice(0, want.quantity);
+    for (const o of picked) {
+      const key = `${o.storeId}|${want.articleNumber}`;
+      const unit = bought.get(key) ?? {
+        articleNumber: want.articleNumber,
+        name: want.name,
+        count: 0,
+        spend: 0,
+        saving: 0,
+      };
+      unit.count += 1;
+      unit.spend = round2(unit.spend + o.price);
+      unit.saving = round2(unit.saving + unitSaving(o));
+      bought.set(key, unit);
+    }
+  }
+  const stops: RouteStop[] = input.order.map((storeId) => ({
+    storeId,
+    units: [...bought.entries()]
+      .filter(([key]) => key.startsWith(`${storeId}|`))
+      .map(([, unit]) => unit),
+  }));
+  if (stops.some((s) => s.units.length === 0)) return undefined;
+  const all = stops.flatMap((s) => s.units);
+  const saving = round2(all.reduce((n, u) => n + u.saving, 0));
+  const tripCost = round2(
+    input.totalKm * (input.consumptionPer100km / 100) * input.fuelPrice,
+  );
+  const net = round2(saving - tripCost);
+  return {
+    stops,
+    totalKm: round2(input.totalKm),
+    tripCost,
+    spend: round2(all.reduce((n, u) => n + u.spend, 0)),
+    saving,
+    net,
+    worthIt: net > 0,
+  };
+}
+
+function* subsets<T>(items: T[], size: number, start = 0): Generator<T[]> {
+  if (size === 0) {
+    yield [];
+    return;
+  }
+  for (let i = start; i <= items.length - size; i++) {
+    const item = items[i] as T;
+    for (const rest of subsets(items, size - 1, i + 1)) yield [item, ...rest];
+  }
+}
+
+function* permutations<T>(items: T[]): Generator<T[]> {
+  if (items.length <= 1) {
+    yield items;
+    return;
+  }
+  for (let i = 0; i < items.length; i++) {
+    const rest = [...items.slice(0, i), ...items.slice(i + 1)];
+    for (const p of permutations(rest)) yield [items[i] as T, ...p];
+  }
+}
+
+/** Brute-forces every subset (<= maxStops) and visiting order; returns the route with the best net. */
+export function findBestRoute(input: {
+  storeIds: string[];
+  maxStops: number;
+  homeKm: (storeId: string) => number;
+  betweenKm: (from: string, to: string) => number;
+  fuelPrice: number;
+  consumptionPer100km: number;
+  wants: RouteWant[];
+  offers: RouteOffer[];
+}): { best: RouteResult | undefined; bestSingle: RouteResult | undefined } {
+  const wanted = new Set(input.wants.map((w) => w.articleNumber));
+  const useful = input.storeIds.filter((id) =>
+    input.offers.some((o) => o.storeId === id && wanted.has(o.articleNumber)),
+  );
+  let best: RouteResult | undefined;
+  let bestSingle: RouteResult | undefined;
+  const better = (a: RouteResult, b: RouteResult | undefined): boolean =>
+    !b || a.net > b.net || (a.net === b.net && a.totalKm < b.totalKm);
+
+  for (let size = 1; size <= Math.min(input.maxStops, useful.length); size++) {
+    for (const subset of subsets(useful, size)) {
+      for (const order of permutations(subset)) {
+        const first = order[0] ?? "";
+        const last = order[order.length - 1] ?? "";
+        let km = input.homeKm(first);
+        for (let i = 1; i < order.length; i++) {
+          km += input.betweenKm(order[i - 1] ?? "", order[i] ?? "");
+        }
+        km += input.homeKm(last);
+        const result = evaluateRoute({
+          order,
+          totalKm: km,
+          fuelPrice: input.fuelPrice,
+          consumptionPer100km: input.consumptionPer100km,
+          wants: input.wants,
+          offers: input.offers,
+        });
+        if (!result) continue;
+        if (better(result, best)) best = result;
+        if (size === 1 && better(result, bestSingle)) bestSingle = result;
+      }
+    }
+  }
+  return { best, bestSingle };
+}
+
 export type StoreTrip = TripResult & {
   storeId: string;
   storeName: string;
   followed: boolean;
   oneWayKm: number;
   distanceSource: "route" | "estimate";
+};
+
+export type RouteStopView = {
+  storeId: string;
+  storeName: string;
+  followed: boolean;
+  /** Distance of the leg that ends at this stop (km). */
+  legKm: number;
+  units: RouteStop["units"];
+};
+
+export type BestRoute = Omit<RouteResult, "stops"> & {
+  stops: RouteStopView[];
+  /** Net advantage over the best single store (0 when the best route is a single store). */
+  gainOverSingle: number;
+  bestSingleName: string | undefined;
+  bestSingleNet: number | undefined;
 };
 
 export type TripsResponse =
@@ -197,9 +383,82 @@ export type TripsResponse =
       postcode: string;
       fuelPrice: number;
       consumptionPer100km: number;
+      maxStops: number;
       wantedUnits: number;
       stores: StoreTrip[];
+      bestRoute: BestRoute | undefined;
     };
+
+/** Driving km between two stores (directed), via one OSRM table request; cached forever. */
+async function ensureStoreDistances(
+  db: DatabaseSync,
+  storeIds: string[],
+): Promise<void> {
+  const known = new Set(
+    (
+      db.prepare("SELECT from_store, to_store FROM store_dist").all() as {
+        from_store: string;
+        to_store: string;
+      }[]
+    ).map((r) => `${r.from_store}>${r.to_store}`),
+  );
+  const ids = storeIds.filter((id) => STORE_COORDS[id]);
+  const missing = ids.some((a) =>
+    ids.some((b) => a !== b && !known.has(`${a}>${b}`)),
+  );
+  if (!missing) return;
+
+  let matrix: (number | null)[][] | undefined;
+  try {
+    const coords = ids
+      .map(
+        (id) =>
+          `${String(STORE_COORDS[id]?.lon)},${String(STORE_COORDS[id]?.lat)}`,
+      )
+      .join(";");
+    const res = await fetch(
+      `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=distance`,
+      { signal: AbortSignal.timeout(20_000) },
+    );
+    const data = (await res.json()) as {
+      code: string;
+      distances?: (number | null)[][];
+    };
+    if (data.code === "Ok") matrix = data.distances;
+  } catch {
+    matrix = undefined;
+  }
+  const put = db.prepare(
+    "INSERT OR REPLACE INTO store_dist (from_store, to_store, km, source) VALUES (?, ?, ?, ?)",
+  );
+  ids.forEach((a, i) => {
+    ids.forEach((b, j) => {
+      if (a === b) return;
+      const meters = matrix?.[i]?.[j];
+      const from = STORE_COORDS[a];
+      const to = STORE_COORDS[b];
+      if (!from || !to) return;
+      if (typeof meters === "number") {
+        put.run(a, b, Math.round(meters / 100) / 10, "route");
+      } else {
+        put.run(
+          a,
+          b,
+          Math.round(haversineKm(from, to) * DETOUR_FACTOR * 10) / 10,
+          "estimate",
+        );
+      }
+    });
+  });
+}
+
+function storeKm(db: DatabaseSync, from: string, to: string): number {
+  if (from === to) return 0;
+  const row = db
+    .prepare("SELECT km FROM store_dist WHERE from_store = ? AND to_store = ?")
+    .get(from, to) as { km: number } | undefined;
+  return row?.km ?? Number.POSITIVE_INFINITY;
+}
 
 export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   const settings = getSettings(db);
@@ -225,15 +484,17 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     `SELECT price, original_price FROM offers
      WHERE store_id = ? AND article_number = ? AND active = 1`,
   );
+  const storeList = listStores(db);
   const stores: StoreTrip[] = [];
-  for (const store of listStores(db)) {
+  const homeKm = new Map<string, number>();
+  const routeOffers: RouteOffer[] = [];
+  for (const store of storeList) {
+    if (store.tripExcluded) continue;
     const dist = await drivingKm(db, postcode, home, store.storeId);
     if (!dist) continue;
-    const items = watch.map((w): TripItemInput => ({
-      articleNumber: w.article_number,
-      name: `${w.name} ${w.type_name}`.trim(),
-      quantity: w.quantity,
-      offers: (
+    homeKm.set(store.storeId, dist.km);
+    const items = watch.map((w): TripItemInput => {
+      const offers = (
         offersStmt.all(store.storeId, w.article_number) as {
           price: number;
           original_price: number | null;
@@ -241,8 +502,21 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
       ).map((o) => ({
         price: o.price,
         originalPrice: o.original_price ?? undefined,
-      })),
-    }));
+      }));
+      for (const o of offers) {
+        routeOffers.push({
+          ...o,
+          storeId: store.storeId,
+          articleNumber: w.article_number,
+        });
+      }
+      return {
+        articleNumber: w.article_number,
+        name: `${w.name} ${w.type_name}`.trim(),
+        quantity: w.quantity,
+        offers,
+      };
+    });
     stores.push({
       ...evaluateTrip({
         distanceKm: dist.km,
@@ -258,12 +532,60 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     });
   }
   stores.sort((a, b) => b.net - a.net);
+
+  const storeIds = [...homeKm.keys()];
+  await ensureStoreDistances(db, storeIds);
+  const wants = watch.map((w) => ({
+    articleNumber: w.article_number,
+    name: `${w.name} ${w.type_name}`.trim(),
+    quantity: w.quantity,
+  }));
+  const { best, bestSingle } = findBestRoute({
+    storeIds,
+    maxStops: settings.maxStops,
+    homeKm: (id) => homeKm.get(id) ?? Number.POSITIVE_INFINITY,
+    betweenKm: (a, b) => storeKm(db, a, b),
+    fuelPrice: settings.fuelPrice,
+    consumptionPer100km: settings.consumptionPer100km,
+    wants,
+    offers: routeOffers,
+  });
+
+  const nameOf = (id: string) => storeList.find((s) => s.storeId === id);
+  let bestRoute: BestRoute | undefined;
+  if (best) {
+    let prev: string | undefined;
+    const stops = best.stops.map((stop): RouteStopView => {
+      const legKm = prev
+        ? storeKm(db, prev, stop.storeId)
+        : (homeKm.get(stop.storeId) ?? 0);
+      prev = stop.storeId;
+      return {
+        storeId: stop.storeId,
+        storeName: nameOf(stop.storeId)?.name ?? stop.storeId,
+        followed: nameOf(stop.storeId)?.followed ?? false,
+        legKm,
+        units: stop.units,
+      };
+    });
+    const singleStore = bestSingle?.stops[0]?.storeId;
+    bestRoute = {
+      ...best,
+      stops,
+      gainOverSingle: bestSingle ? round2(best.net - bestSingle.net) : 0,
+      bestSingleName: singleStore ? nameOf(singleStore)?.name : undefined,
+      bestSingleNet: bestSingle?.net,
+    };
+  }
+
   return {
     configured: true,
     postcode,
     fuelPrice: settings.fuelPrice,
     consumptionPer100km: settings.consumptionPer100km,
+    maxStops: settings.maxStops,
     wantedUnits: watch.reduce((s, w) => s + w.quantity, 0),
     stores,
+    bestRoute,
   };
 }

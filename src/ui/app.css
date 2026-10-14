@@ -306,3 +306,20 @@ a.btn {
   border: 1px solid var(--line);
   text-decoration: none;
 }
+.banner-good {
+  display: block;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--good);
+  background: var(--good-bg);
+  color: var(--good);
+  text-decoration: none;
+  line-height: 1.5;
+}
+.banner-good[hidden] {
+  display: none;
+}
+.banner-good strong {
+  font-weight: 800;
+}
