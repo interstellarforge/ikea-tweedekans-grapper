@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+} from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -57,4 +62,9 @@ export function decryptSecret(stored: string): string {
   return Buffer.concat([decipher.update(data), decipher.final()]).toString(
     "utf8",
   );
+}
+
+/** Derives a purpose-specific 32-byte key from the master key. */
+export function deriveKey(label: string): Buffer {
+  return createHmac("sha256", getKey()).update(label).digest();
 }

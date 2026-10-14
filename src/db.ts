@@ -117,6 +117,15 @@ export function openDb(path: string): DatabaseSync {
     );
     CREATE INDEX IF NOT EXISTS price_history_article ON price_history (article_number);
   `);
+  const alertCols = (
+    db.prepare("PRAGMA table_info(alerts)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!alertCols.includes("note")) {
+    db.exec("ALTER TABLE alerts ADD COLUMN note TEXT NOT NULL DEFAULT ''");
+  }
+  if (!alertCols.includes("delivery")) {
+    db.exec("ALTER TABLE alerts ADD COLUMN delivery TEXT NOT NULL DEFAULT ''");
+  }
   return db;
 }
 

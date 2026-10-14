@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inloggen · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      body {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+      form {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 28px;
+        width: min(360px, 92vw);
+      }
+      .brand {
+        display: block;
+        background: var(--brand);
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      label {
+        display: block;
+        margin: 12px 0 4px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+      }
+      button {
+        width: 100%;
+        margin-top: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="form">
+      <span class="brand"
+        ><span class="brand" style="padding: 0; margin: 0; background: none"
+          >IKEA TWEEDEKANS</span
+        ></span
+      >
+      <label for="username">Gebruikersnaam</label>
+      <input
+        type="text"
+        id="username"
+        autocomplete="username"
+        required
+        autofocus
+      />
+      <label for="password">Wachtwoord</label>
+      <input
+        type="password"
+        id="password"
+        autocomplete="current-password"
+        required
+      />
+      <button type="submit">Inloggen</button>
+      <p class="err" id="msg" role="alert"></p>
+    </form>
+    <script>
+      document.getElementById("form").onsubmit = async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("msg");
+        msg.textContent = "";
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+        if (res.ok) {
+          const next = new URLSearchParams(location.search).get("next");
+          location.href =
+            next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+        } else {
+          msg.textContent =
+            (await res.json().catch(() => ({}))).error || "Inloggen mislukt";
+        }
+      };
+    </script>
+  </body>
+</html>

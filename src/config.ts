@@ -9,5 +9,8 @@ export const config = {
   // Public client key shipped in IKEA's own as-is web app; override if it rotates.
   clientId:
     process.env["IKEA_CLIENT_ID"] ?? "d530fa19-39b9-4f3f-9276-61146d470502",
+  authUser: process.env["AUTH_USERNAME"] ?? "admin",
+  authPassword: process.env["AUTH_PASSWORD"] ?? "",
+  authDisabled: process.env["AUTH_DISABLED"] === "true",
   apiRoot: "https://web-api.ikea.com/circular/circular-asis",
 };

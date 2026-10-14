@@ -4,8 +4,11 @@ services:
     image: ikea-tweedekans-grapper:latest
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8090}:8080"
+      # APP_BIND=127.0.0.1 exposes the port to the host only (use when the proxy runs on the same host).
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8090}:8080"
     environment:
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:?set AUTH_PASSWORD in .env}
       POLL_INTERVAL_MIN: ${POLL_INTERVAL_MIN:-15}
       # Optional: 64 hex chars (openssl rand -hex 32). Default: generated and stored in the data volume.
       SECRET_KEY: ${SECRET_KEY:-}

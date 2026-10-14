@@ -8,6 +8,12 @@ import {
 import type { DatabaseSync } from "node:sqlite";
 
 import {
+  type Auth,
+  parseCookie,
+  SESSION_COOKIE,
+  SESSION_TTL_MS,
+} from "./auth.ts";
+import {
   articleInsights,
   listStores,
   offerProductInfo,
@@ -44,13 +50,13 @@ const PAGES: Record<string, string> = {
   "/watchlist": "watchlist.html",
   "/catalog": "catalog.html",
   "/tweedekans": "tweedekans.html",
+  "/alerts": "alerts.html",
   "/settings": "settings.html",
 };
 
 const PRODUCT_PAGE = "product.html";
 
 const ASSETS: Record<string, { file: string; type: string }> = {
-  "/assets/app.css": { file: "app.css", type: "text/css" },
   "/assets/app.js": { file: "app.js", type: "text/javascript" },
 };
 
@@ -79,17 +85,92 @@ function send(
 ): undefined {
   res.writeHead(status, {
     "content-type": `${type}; charset=utf-8`,
-    "cache-control": "no-cache",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "same-origin",
   });
   res.end(type === "application/json" ? JSON.stringify(body) : String(body));
   return undefined;
 }
 
-export function createApp(db: DatabaseSync): Server {
+export function createApp(db: DatabaseSync, auth: Auth): Server {
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const method = req.method ?? "GET";
     const path = url.pathname;
+    const clientIp = (
+      (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0] ??
+      req.socket.remoteAddress ??
+      "unknown"
+    ).trim();
+    const secure = req.headers["x-forwarded-proto"] === "https";
+    const authed = auth.verifyToken(
+      parseCookie(req.headers.cookie, SESSION_COOKIE),
+    );
+
+    if (method === "GET" && path === "/healthz") {
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === "GET" && path === "/login") {
+      if (authed) {
+        res.writeHead(302, { location: "/" });
+        res.end();
+        return;
+      }
+      send(res, 200, uiFile("login.html"), "text/html");
+      return;
+    }
+
+    if (method === "GET" && path === "/assets/app.css") {
+      send(res, 200, uiFile("app.css"), "text/css");
+      return;
+    }
+
+    if (method === "POST" && path === "/api/login") {
+      if (auth.isLocked(clientIp)) {
+        send(res, 429, {
+          error: "Te veel pogingen, probeer het over 15 minuten opnieuw",
+        });
+        return;
+      }
+      const body = await readJson(req);
+      if (auth.checkCredentials(str(body["username"]), str(body["password"]))) {
+        auth.clearFailures(clientIp);
+        res.setHeader(
+          "set-cookie",
+          `${SESSION_COOKIE}=${auth.issueToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(SESSION_TTL_MS / 1000)}${secure ? "; Secure" : ""}`,
+        );
+        send(res, 200, { ok: true });
+      } else {
+        auth.recordFailure(clientIp);
+        await new Promise((r) => setTimeout(r, 600));
+        send(res, 401, { error: "Onjuiste gebruikersnaam of wachtwoord" });
+      }
+      return;
+    }
+
+    if (method === "POST" && path === "/api/logout") {
+      res.setHeader(
+        "set-cookie",
+        `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`,
+      );
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (!authed) {
+      if (method === "GET" && !path.startsWith("/api/")) {
+        const next = path === "/" ? "" : `?next=${encodeURIComponent(path)}`;
+        res.writeHead(302, { location: `/login${next}` });
+        res.end();
+        return;
+      }
+      send(res, 401, { error: "Niet ingelogd" });
+      return;
+    }
 
     if (method === "GET") {
       if (path === "/") {
@@ -292,7 +373,15 @@ export function createApp(db: DatabaseSync): Server {
     }
 
     if (method === "GET" && path === "/api/alerts") {
-      send(res, 200, listAlerts(db));
+      send(
+        res,
+        200,
+        listAlerts(
+          db,
+          num(url.searchParams.get("limit")),
+          num(url.searchParams.get("offset")),
+        ),
+      );
       return;
     }
 

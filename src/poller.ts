@@ -9,9 +9,9 @@ import {
   upsertStores,
 } from "./db.ts";
 import { fetchStoreOffers, fetchStores } from "./ikea-client.ts";
-import { notifyAlert } from "./notify.ts";
+import { notifyAlert, tagText } from "./notify.ts";
 import { getSettings } from "./settings.ts";
-import { isWatched, recordAlert } from "./watchlist.ts";
+import { isWatched, recordAlert, setAlertDelivery } from "./watchlist.ts";
 
 export type PollStatus = {
   running: boolean;
@@ -42,6 +42,11 @@ export async function pollStore(
       listStores(db).find((s) => s.storeId === storeId)?.name ?? storeId;
     for (const o of added) {
       if (!o.articleNumber || !isWatched(db, o.articleNumber)) continue;
+      const tag = articleInsights(db, [o.articleNumber])[
+        o.articleNumber
+      ]?.offers.find(
+        (x) => x.offerNumber === o.offerNumber && x.storeId === storeId,
+      )?.tag;
       const alert = {
         storeId,
         offerNumber: o.offerNumber,
@@ -52,14 +57,13 @@ export async function pollStore(
         storeName,
         createdAt: now,
         seen: false,
+        note: tagText(tag),
+        delivery: "",
       };
       if (!recordAlert(db, alert)) continue;
-      const tag = articleInsights(db, [o.articleNumber])[
-        o.articleNumber
-      ]?.offers.find(
-        (x) => x.offerNumber === o.offerNumber && x.storeId === storeId,
-      )?.tag;
-      void notifyAlert(db, alert, tag);
+      void notifyAlert(db, alert).then((delivery) => {
+        setAlertDelivery(db, storeId, o.offerNumber, delivery);
+      });
     }
     return added.length;
   } catch (error) {

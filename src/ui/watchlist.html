@@ -39,7 +39,9 @@
       const refreshShell = initShell("watchlist");
 
       async function loadAlerts() {
-        const unseen = (await api("/api/alerts")).filter((a) => !a.seen);
+        const unseen = (await api("/api/alerts?limit=200")).items.filter(
+          (a) => !a.seen,
+        );
         $("alertPanel").hidden = unseen.length === 0;
         $("alerts").replaceChildren(
           ...unseen.map((a) =>
@@ -54,10 +56,8 @@
                 textContent: `${a.description} · ${ago(a.createdAt)}`,
               }),
               el("a", {
-                href: "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/",
-                target: "_blank",
-                rel: "noopener",
-                textContent: "Naar tweedekanshoek",
+                href: `/product/${a.articleNumber}`,
+                textContent: "Bekijk product",
               }),
             ),
           ),

@@ -18,5 +18,5 @@ USER node
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/status').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "src/main.ts"]

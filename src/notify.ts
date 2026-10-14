@@ -63,29 +63,40 @@ export async function sendEmail(
   });
 }
 
-/** Sends an alert over every enabled channel; failures are logged, never thrown. */
+/** Sends an alert over every enabled channel; returns a per-channel result summary. */
 export async function notifyAlert(
   db: DatabaseSync,
   alert: Alert,
-  tag: PriceTag | undefined,
-): Promise<void> {
+): Promise<string> {
   const { ntfyUrl, email } = getSettings(db);
-  const note = tagText(tag);
-  const body = `${alert.description} voor ${euro(alert.price)}${note ? ` — ${note}` : ""}`;
-  const jobs: Promise<void>[] = [];
-  if (ntfyUrl)
-    jobs.push(sendNtfy(ntfyUrl, `Tweedekans: ${headline(alert)}`, body));
+  const body = `${alert.description} voor ${euro(alert.price)}${alert.note ? ` — ${alert.note}` : ""}`;
+  const jobs: [string, Promise<void>][] = [];
+  if (ntfyUrl) {
+    jobs.push([
+      "ntfy",
+      sendNtfy(ntfyUrl, `Tweedekans: ${headline(alert)}`, body),
+    ]);
+  }
   if (email.enabled) {
-    jobs.push(
+    jobs.push([
+      "e-mail",
       sendEmail(
         email,
         `Tweedekans: ${headline(alert)}`,
         `${headline(alert)}\n\n${body}\nArtikel ${alert.articleNumber} · aanbieding ${alert.offerNumber}\n\n${OFFERS_URL}\n`,
       ),
-    );
+    ]);
   }
-  for (const result of await Promise.allSettled(jobs)) {
-    if (result.status === "rejected")
-      console.error("[notify] failed:", result.reason);
-  }
+  if (jobs.length === 0) return "geen kanaal ingesteld";
+  const results = await Promise.allSettled(jobs.map(([, job]) => job));
+  return results
+    .map((r, i) => {
+      const name = jobs[i]?.[0] ?? "?";
+      if (r.status === "fulfilled") return `${name}: ok`;
+      const msg =
+        r.reason instanceof Error ? r.reason.message : String(r.reason);
+      console.error(`[notify] ${name} failed:`, msg);
+      return `${name}: fout (${msg})`;
+    })
+    .join(" · ");
 }

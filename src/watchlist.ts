@@ -17,6 +17,10 @@ export type Alert = {
   storeName: string;
   createdAt: number;
   seen: boolean;
+  /** Price comparison at alert time, e.g. "nieuwe laagste prijs (eerder €5,20)". */
+  note: string;
+  /** Delivery result per channel, e.g. "ntfy: ok · e-mail: fout: timeout". Empty while sending. */
+  delivery: string;
 };
 
 export function addWatchItem(
@@ -75,8 +79,8 @@ export function isWatched(db: DatabaseSync, articleNumber: string): boolean {
 export function recordAlert(db: DatabaseSync, alert: Alert): boolean {
   const res = db
     .prepare(
-      `INSERT OR IGNORE INTO alerts (store_id, offer_number, article_number, title, description, price, store_name, created_at, seen)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      `INSERT OR IGNORE INTO alerts (store_id, offer_number, article_number, title, description, price, store_name, created_at, seen, note, delivery)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     )
     .run(
       alert.storeId,
@@ -87,19 +91,51 @@ export function recordAlert(db: DatabaseSync, alert: Alert): boolean {
       alert.price,
       alert.storeName,
       alert.createdAt,
+      alert.note,
+      alert.delivery,
     );
   return res.changes > 0;
 }
 
-export function listAlerts(db: DatabaseSync, limit = 100): Alert[] {
+export function setAlertDelivery(
+  db: DatabaseSync,
+  storeId: string,
+  offerNumber: string,
+  delivery: string,
+): void {
+  db.prepare(
+    "UPDATE alerts SET delivery = ? WHERE store_id = ? AND offer_number = ?",
+  ).run(delivery, storeId, offerNumber);
+}
+
+export type AlertPage = { total: number; unseen: number; items: Alert[] };
+
+/** Alert history, newest first. */
+export function listAlerts(
+  db: DatabaseSync,
+  limit = 50,
+  offset = 0,
+): AlertPage {
+  const counts = db
+    .prepare(
+      "SELECT COUNT(*) AS total, ifnull(SUM(seen = 0), 0) AS unseen FROM alerts",
+    )
+    .get() as { total: number; unseen: number };
   const rows = db
     .prepare(
       `SELECT store_id AS storeId, offer_number AS offerNumber, article_number AS articleNumber,
-              title, description, price, store_name AS storeName, created_at AS createdAt, seen
-       FROM alerts ORDER BY created_at DESC LIMIT ?`,
+              title, description, price, store_name AS storeName, created_at AS createdAt, seen,
+              note, delivery
+       FROM alerts ORDER BY created_at DESC, offer_number LIMIT ? OFFSET ?`,
     )
-    .all(limit) as (Omit<Alert, "seen"> & { seen: number })[];
-  return rows.map((r) => ({ ...r, seen: r.seen === 1 }));
+    .all(Math.min(Math.max(limit, 1), 200), Math.max(offset, 0)) as (Omit<
+    Alert,
+    "seen"
+  > & { seen: number })[];
+  return {
+    ...counts,
+    items: rows.map((r) => ({ ...r, seen: r.seen === 1 })),
+  };
 }
 
 export function markAlertsSeen(db: DatabaseSync): void {

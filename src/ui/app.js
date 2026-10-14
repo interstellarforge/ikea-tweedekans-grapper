@@ -3,6 +3,10 @@ const App = (() => {
 
   const api = async (path, opts) => {
     const res = await fetch(path, opts);
+    if (res.status === 401) {
+      location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+      throw new Error("Niet ingelogd");
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
@@ -162,6 +166,7 @@ const App = (() => {
     ["watchlist", "/watchlist", "Watchlist"],
     ["catalog", "/catalog", "Zoeken in producten"],
     ["tweedekans", "/tweedekans", "Zoeken in tweedekanshoek"],
+    ["alerts", "/alerts", "Meldingen"],
     ["settings", "/settings", "Instellingen"],
   ];
 
@@ -175,10 +180,19 @@ const App = (() => {
           "a",
           { href, className: key === active ? "active" : "" },
           label,
-          key === "watchlist" ? badge : null,
+          key === "alerts" ? badge : null,
         ),
       ),
     );
+    const logout = el("button", {
+      className: "secondary",
+      textContent: "Uitloggen",
+      style: "margin-left:auto;color:#fff;border-color:rgba(255,255,255,.4)",
+    });
+    logout.onclick = async () => {
+      await fetch("/api/logout", { method: "POST" });
+      location.href = "/login";
+    };
     document.body.prepend(
       el(
         "header",
@@ -188,13 +202,13 @@ const App = (() => {
           { className: "inner" },
           el("a", { className: "brand", href: "/" }, "IKEA TWEEDEKANS"),
           nav,
+          logout,
         ),
       ),
     );
     const refresh = async () => {
       try {
-        const alerts = await api("/api/alerts");
-        const unseen = alerts.filter((a) => !a.seen).length;
+        const { unseen } = await api("/api/alerts?limit=1");
         badge.hidden = unseen === 0;
         badge.textContent = unseen;
         document.title = `${unseen ? `(${unseen}) ` : ""}${document.title.replace(/^\(\d+\) /, "")}`;

@@ -10,7 +10,7 @@ LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, searc
     pnpm install
     pnpm start        # http://<host>:8080
 
-Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA_COUNTRY`/`IKEA_LANGUAGE` (nl), `IKEA_CLIENT_ID`, `NTFY_URL` (optional push, e.g. `https://ntfy.sh/<topic>`). E-mail (SMTP) en ntfy stel je in op `/settings`; het SMTP-wachtwoord wordt met AES-256-GCM versleuteld opgeslagen; de sleutel staat in `data/secret.key` (0600) of in `SECRET_KEY` (64 hex-tekens).
+Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA_COUNTRY`/`IKEA_LANGUAGE` (nl), `IKEA_CLIENT_ID`, `AUTH_USERNAME` (admin), **`AUTH_PASSWORD` (verplicht, min. 8 tekens; `AUTH_DISABLED=true` zet login uit)**, `NTFY_URL` (optional push, e.g. `https://ntfy.sh/<topic>`). E-mail (SMTP) en ntfy stel je in op `/settings`; het SMTP-wachtwoord wordt met AES-256-GCM versleuteld opgeslagen; de sleutel staat in `data/secret.key` (0600) of in `SECRET_KEY` (64 hex-tekens).
 
 ## Linux service
 
@@ -19,7 +19,7 @@ to `/etc/systemd/system/`, `systemctl enable --now ikea-tweedekans`.
 
 ## Pages
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/settings` (gevolgde filialen, interval, ntfy, status).
+`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/alerts` (meldingshistorie), `/settings` (gevolgde filialen, interval, ntfy, status).
 
 Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
 Gevolgde filialen bepalen alleen waarvoor meldingen komen.
@@ -50,3 +50,9 @@ Zet daarna in `/settings` van de app de ntfy-URL op `<NTFY_BASE_URL>/tweedekans`
 Data (SQLite + `secret.key`) staat in het volume `tweedekans-data` (`/data`). UI: `http://<host>:<APP_PORT>/`.
 Draait ntfy op dezelfde host, gebruik dan als ntfy-URL `http://<host>:<NTFY_PORT>/tweedekans`
 (vanuit de container is `localhost` niet de host).
+
+## Beveiliging
+
+- Alle pagina's en API's vereisen login (sessiecookie: HttpOnly, SameSite=Lax, 30 dagen, `Secure` achter HTTPS-proxy).
+- Max. 5 foute pogingen per IP per 15 min. `/healthz` is publiek.
+- Zet de app achter HTTPS (Nginx Proxy Manager) en bij voorkeur een Access List/IP-beperking in NPM als extra laag.
