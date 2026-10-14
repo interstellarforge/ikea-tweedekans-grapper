@@ -1,0 +1,7 @@
+node_modules
+data
+deploy
+.git
+.env
+*.md
+tsconfig.tsbuildinfo

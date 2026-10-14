@@ -1,0 +1,17 @@
+services:
+  tweedekans:
+    build: .
+    image: ikea-tweedekans-grapper:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8090}:8080"
+    environment:
+      POLL_INTERVAL_MIN: ${POLL_INTERVAL_MIN:-15}
+      # Optional: 64 hex chars (openssl rand -hex 32). Default: generated and stored in the data volume.
+      SECRET_KEY: ${SECRET_KEY:-}
+      TZ: Europe/Amsterdam
+    volumes:
+      - tweedekans-data:/data
+
+volumes:
+  tweedekans-data:

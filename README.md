@@ -41,3 +41,12 @@ Gevolgde filialen bepalen alleen waarvoor meldingen komen.
 Nginx Proxy Manager: Proxy Host met scheme `http`, forward host = jupiter, forward port = `NTFY_PORT`,
 **Websockets Support aan** (nodig voor live meldingen), SSL naar keuze.
 Zet daarna in `/settings` van de app de ntfy-URL op `<NTFY_BASE_URL>/tweedekans` en abonneer de ntfy-app op topic `tweedekans`.
+
+## App in Docker
+
+    cp .env.example .env     # APP_PORT (standaard 8090), POLL_INTERVAL_MIN, optioneel SECRET_KEY
+    docker compose up -d --build
+
+Data (SQLite + `secret.key`) staat in het volume `tweedekans-data` (`/data`). UI: `http://<host>:<APP_PORT>/`.
+Draait ntfy op dezelfde host, gebruik dan als ntfy-URL `http://<host>:<NTFY_PORT>/tweedekans`
+(vanuit de container is `localhost` niet de host).
