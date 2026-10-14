@@ -29,11 +29,11 @@ import {
   searchCatalog,
 } from "./ikea-client.ts";
 import {
-  alertLinks,
   listHaNotifyTargets,
   sendEmail,
   sendHa,
   sendNtfy,
+  testContent,
 } from "./notify.ts";
 import { pollAll, pollStatus } from "./poller.ts";
 import {
@@ -305,20 +305,12 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
             "Dit is een testmelding van IKEA Tweedekans. E-mail werkt.",
           );
         } else if (testMatch[1] === "ha") {
-          await sendHa(
-            settings.homeAssistant,
-            "Tweedekans: testmelding",
-            "Home Assistant werkt.",
-            alertLinks(settings.appUrl),
-          );
+          const t = testContent(db, settings.appUrl, "Home Assistant werkt.");
+          await sendHa(settings.homeAssistant, t.title, t.body, t.links);
         } else {
           if (!settings.ntfyUrl) throw new Error("Geen ntfy-URL ingesteld");
-          await sendNtfy(
-            settings.ntfyUrl,
-            "Tweedekans: testmelding",
-            "ntfy werkt. Tik om de meldingenpagina te openen.",
-            alertLinks(settings.appUrl),
-          );
+          const t = testContent(db, settings.appUrl, "ntfy werkt.");
+          await sendNtfy(settings.ntfyUrl, t.title, t.body, t.links);
         }
         send(res, 200, { ok: true });
       } catch (error) {

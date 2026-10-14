@@ -211,6 +211,55 @@ export async function sendHa(
   if (failed.length) throw new Error(failed.join("; "));
 }
 
+/**
+ * Content for a test notification. Uses a real current offer so that tapping it behaves exactly
+ * like a real alert (opens that offer at IKEA); falls back to a generic message without offers.
+ */
+export function testContent(
+  db: DatabaseSync,
+  appUrl: string,
+  fallbackBody: string,
+): { title: string; body: string; links: NtfyLinks } {
+  const row = db
+    .prepare(
+      `SELECT o.title, o.description, o.price, o.offer_number, o.article_number, s.name
+       FROM offers o JOIN stores s ON s.store_id = o.store_id
+       WHERE o.active = 1 AND o.article_number IS NOT NULL
+       ORDER BY s.followed DESC, o.last_seen DESC LIMIT 1`,
+    )
+    .get() as
+    | {
+        title: string;
+        description: string;
+        price: number;
+        offer_number: string;
+        article_number: string;
+        name: string;
+      }
+    | undefined;
+  if (!row) {
+    return {
+      title: "Tweedekans: testmelding",
+      body: fallbackBody,
+      links: alertLinks(appUrl),
+    };
+  }
+  const alert = {
+    title: row.title,
+    storeName: row.name,
+    price: row.price,
+  } as Alert;
+  return {
+    title: `Tweedekans (test): ${headline(alert)}`,
+    body: `${row.description} voor ${euro(row.price)} — dit is een testmelding, tikken opent deze aanbieding bij IKEA.`,
+    links: alertLinks(appUrl, {
+      storeName: row.name,
+      offerNumber: row.offer_number,
+      articleNumber: row.article_number,
+    }),
+  };
+}
+
 /** Sends an alert over every enabled channel; returns a per-channel result summary. */
 export async function notifyAlert(
   db: DatabaseSync,
