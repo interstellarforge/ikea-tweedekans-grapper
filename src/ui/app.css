@@ -1195,23 +1195,44 @@ dialog.modal textarea {
 
 .auth {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  background: var(--blue);
 }
 .auth-aside {
-  display: none;
+  display: flex;
+  position: relative;
+  overflow: hidden;
   background: var(--blue);
   color: #fff;
-  padding: 48px 56px;
+  padding: 22px 22px 56px;
   flex-direction: column;
   justify-content: space-between;
-  gap: 32px;
+  gap: 18px;
+}
+.auth-aside::after {
+  content: "";
+  position: absolute;
+  right: -38px;
+  bottom: -18px;
+  width: 150px;
+  height: 104px;
+  background: var(--yellow);
+  border-radius: 14px;
+  transform: rotate(-12deg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+}
+.auth .auth-aside .fine,
+.auth .auth-aside ul {
+  display: none;
 }
 .auth-aside .brand {
   font-size: 19px;
 }
 .auth-aside h2 {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 800;
   line-height: 1.15;
   max-width: 16ch;
@@ -1246,10 +1267,22 @@ dialog.modal textarea {
 }
 .auth-main {
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: center;
-  padding: 28px 18px;
+  padding: 26px 20px 32px;
   gap: 18px;
+  background: var(--bg);
+  border-radius: 24px 24px 0 0;
+  margin-top: -28px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+}
+.auth-top .brand {
+  display: none;
+}
+.auth-top {
+  justify-content: flex-end;
 }
 .auth-top {
   width: min(420px, 100%);
@@ -1284,6 +1317,10 @@ dialog.modal textarea {
   min-height: 46px;
 }
 .auth-card form button[type="submit"] {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: #111a24;
+  font-weight: 800;
   width: 100%;
   margin-top: 22px;
   min-height: 48px;
@@ -1315,15 +1352,30 @@ dialog.modal textarea {
 @media (min-width: 900px) {
   .auth {
     grid-template-columns: minmax(380px, 5fr) minmax(0, 6fr);
+    grid-template-rows: none;
+    background: var(--bg);
   }
   .auth-aside {
-    display: flex;
+    padding: 48px 56px;
+    gap: 32px;
   }
-  .auth-top .brand {
+  .auth-aside::after {
     display: none;
   }
-  .auth-top {
-    justify-content: flex-end;
+  .auth .auth-aside .fine,
+  .auth .auth-aside ul {
+    display: grid;
+  }
+  .auth-aside h2 {
+    font-size: 30px;
+  }
+  .auth-main {
+    align-content: center;
+    background: transparent;
+    border-radius: 0;
+    margin-top: 0;
+    box-shadow: none;
+    padding: 28px 18px;
   }
 }
 
