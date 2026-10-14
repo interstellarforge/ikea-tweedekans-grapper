@@ -77,6 +77,18 @@ export function openDb(path: string): DatabaseSync {
       url TEXT,
       added_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS home_geo (
+      postcode TEXT PRIMARY KEY,
+      lat REAL NOT NULL,
+      lon REAL NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS trip_cache (
+      postcode TEXT NOT NULL,
+      store_id TEXT NOT NULL,
+      km REAL NOT NULL,
+      source TEXT NOT NULL,
+      PRIMARY KEY (postcode, store_id)
+    );
     CREATE TABLE IF NOT EXISTS alerts (
       store_id TEXT NOT NULL,
       offer_number TEXT NOT NULL,
@@ -125,6 +137,14 @@ export function openDb(path: string): DatabaseSync {
   }
   if (!alertCols.includes("delivery")) {
     db.exec("ALTER TABLE alerts ADD COLUMN delivery TEXT NOT NULL DEFAULT ''");
+  }
+  const watchCols = (
+    db.prepare("PRAGMA table_info(watch_items)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!watchCols.includes("quantity")) {
+    db.exec(
+      "ALTER TABLE watch_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1",
+    );
   }
   return db;
 }

@@ -58,6 +58,32 @@
       </section>
 
       <section class="panel">
+        <h2>Ritje-check</h2>
+        <p class="hint">
+          Hiermee berekent de app per filiaal of een rit de moeite waard is:
+          besparing op de producten uit je watchlist (aantallen per product)
+          minus brandstofkosten van de retour-rit.
+        </p>
+        <div class="field">
+          <label for="postcode">Postcode</label>
+          <input
+            type="text"
+            id="postcode"
+            placeholder="1234 AB"
+            autocomplete="postal-code"
+          />
+        </div>
+        <div class="field">
+          <label for="fuelPrice">Benzineprijs (€ per liter)</label>
+          <input type="number" id="fuelPrice" min="0.5" max="5" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="consumption">Verbruik (liter per 100 km)</label>
+          <input type="number" id="consumption" min="1" max="40" step="0.1" />
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Meldingen</h2>
 
         <h3>E-mail</h3>
@@ -236,6 +262,9 @@
           pollIntervalMin: Number($("interval").value),
           ntfyUrl: $("ntfy").value,
           appUrl: $("appUrl").value,
+          homePostcode: $("postcode").value,
+          fuelPrice: Number($("fuelPrice").value),
+          consumptionPer100km: Number($("consumption").value),
           email: emailPayload(),
         });
         $("password").value = "";
@@ -329,6 +358,9 @@
         $("interval").value = s.pollIntervalMin;
         $("ntfy").value = s.ntfyUrl;
         $("appUrl").value = s.appUrl || location.origin;
+        $("postcode").value = s.homePostcode;
+        $("fuelPrice").value = s.fuelPrice;
+        $("consumption").value = s.consumptionPer100km;
         const e = s.email;
         $("mailEnabled").checked = e.enabled;
         $("host").value = e.host;

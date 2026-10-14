@@ -23,7 +23,7 @@ Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.
 
 ## Pages
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/alerts` (meldingshistorie), `/settings` (gevolgde filialen, interval, ntfy, status).
+`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/trips` (ritje-check per filiaal), `/alerts` (meldingshistorie), `/settings` (gevolgde filialen, interval, ntfy, status).
 
 Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
 Gevolgde filialen bepalen alleen waarvoor meldingen komen.
@@ -32,7 +32,7 @@ Gevolgde filialen bepalen alleen waarvoor meldingen komen.
 
 `GET /api/stores`, `PUT /api/stores/:id/followed`, `GET|PUT /api/settings`, `GET /api/status`, `POST /api/sync`,
 `GET /api/catalog?q=`, `GET|PUT /api/watchlist`, `DELETE /api/watchlist/:articleNumber`,
-`GET /api/alerts`, `POST /api/alerts/seen`, `GET /api/offers?q=&store=&followed=&newHours=&sort=&limit=&offset=`
+`GET /api/trips`, `PUT /api/watchlist/:articleNumber/quantity`, `GET /api/alerts`, `POST /api/alerts/seen`, `GET /api/offers?q=&store=&followed=&newHours=&sort=&limit=&offset=`
 
 ## ntfy (push) op jupiter
 

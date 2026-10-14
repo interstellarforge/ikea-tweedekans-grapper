@@ -36,12 +36,14 @@ import {
   type SettingsInput,
   toPublic,
 } from "./settings.ts";
+import { computeTrips } from "./trips.ts";
 import {
   addWatchItem,
   listAlerts,
   listWatchItems,
   markAlertsSeen,
   removeWatchItem,
+  setQuantity,
 } from "./watchlist.ts";
 
 const readUi = (name: string): string =>
@@ -74,6 +76,7 @@ const PAGES: Record<string, string> = {
   "/catalog": "catalog.html",
   "/tweedekans": "tweedekans.html",
   "/alerts": "alerts.html",
+  "/trips": "trips.html",
   "/settings": "settings.html",
 };
 
@@ -240,6 +243,15 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       }
       if (typeof body["ntfyUrl"] === "string") input.ntfyUrl = body["ntfyUrl"];
       if (typeof body["appUrl"] === "string") input.appUrl = body["appUrl"];
+      if (typeof body["homePostcode"] === "string") {
+        input.homePostcode = body["homePostcode"];
+      }
+      if (typeof body["fuelPrice"] === "number") {
+        input.fuelPrice = body["fuelPrice"];
+      }
+      if (typeof body["consumptionPer100km"] === "number") {
+        input.consumptionPer100km = body["consumptionPer100km"];
+      }
       const e = body["email"];
       if (typeof e === "object" && e !== null) {
         const m = e as Record<string, unknown>;
@@ -387,6 +399,23 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
         Date.now(),
       );
       send(res, 200, { ok: true });
+      return;
+    }
+
+    const qtyMatch = /^\/api\/watchlist\/(\d{8})\/quantity$/.exec(path);
+    if (method === "PUT" && qtyMatch?.[1]) {
+      const body = await readJson(req);
+      if (typeof body["quantity"] !== "number" || !(body["quantity"] >= 1)) {
+        send(res, 400, { error: "quantity must be a number >= 1" });
+        return;
+      }
+      setQuantity(db, qtyMatch[1], body["quantity"]);
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === "GET" && path === "/api/trips") {
+      send(res, 200, await computeTrips(db));
       return;
     }
 

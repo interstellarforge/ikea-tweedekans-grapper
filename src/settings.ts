@@ -20,6 +20,12 @@ export type Settings = {
   ntfyUrl: string;
   /** Public base URL of this app (no trailing slash); used for deep links in notifications. */
   appUrl: string;
+  /** Home postcode (e.g. 1234AB) for the trip check. */
+  homePostcode: string;
+  /** Fuel price in EUR per litre. */
+  fuelPrice: number;
+  /** Car consumption in litres per 100 km. */
+  consumptionPer100km: number;
   email: EmailSettings;
 };
 
@@ -32,6 +38,9 @@ export type SettingsInput = {
   pollIntervalMin?: number;
   ntfyUrl?: string;
   appUrl?: string;
+  homePostcode?: string;
+  fuelPrice?: number;
+  consumptionPer100km?: number;
   email?: Partial<EmailSettings>;
 };
 
@@ -39,6 +48,9 @@ const defaults = (): Settings => ({
   pollIntervalMin: config.pollIntervalMin,
   ntfyUrl: config.ntfyUrl ?? "",
   appUrl: process.env["APP_URL"] ?? "",
+  homePostcode: "",
+  fuelPrice: 2.1,
+  consumptionPer100km: 7,
   email: {
     enabled: false,
     host: "",
@@ -64,6 +76,15 @@ export function getSettings(db: DatabaseSync): Settings {
     pollIntervalMin: interval > 0 ? interval : d.pollIntervalMin,
     ntfyUrl: map.get("ntfyUrl") ?? d.ntfyUrl,
     appUrl: map.get("appUrl") ?? d.appUrl,
+    homePostcode: map.get("homePostcode") ?? d.homePostcode,
+    fuelPrice:
+      Number(map.get("fuelPrice")) > 0
+        ? Number(map.get("fuelPrice"))
+        : d.fuelPrice,
+    consumptionPer100km:
+      Number(map.get("consumptionPer100km")) > 0
+        ? Number(map.get("consumptionPer100km"))
+        : d.consumptionPer100km,
     email: {
       enabled: map.get("email.enabled") === "1",
       host: map.get("email.host") ?? d.email.host,
@@ -114,6 +135,25 @@ export function saveSettings(
       return "App-URL moet er zo uitzien: https://tweedekans.example.nl";
     }
     writes.push(["appUrl", url]);
+  }
+  if (input.homePostcode !== undefined) {
+    const pc = input.homePostcode.trim();
+    if (pc && !/^[1-9][0-9]{3}\s?[A-Za-z]{2}$/.test(pc)) {
+      return "Postcode moet er zo uitzien: 1234 AB";
+    }
+    writes.push(["homePostcode", pc.replace(/\s+/g, "").toUpperCase()]);
+  }
+  if (input.fuelPrice !== undefined) {
+    if (!(input.fuelPrice > 0 && input.fuelPrice < 10)) {
+      return "Benzineprijs moet tussen 0 en 10 euro per liter liggen";
+    }
+    writes.push(["fuelPrice", String(input.fuelPrice)]);
+  }
+  if (input.consumptionPer100km !== undefined) {
+    if (!(input.consumptionPer100km > 0 && input.consumptionPer100km < 40)) {
+      return "Verbruik moet tussen 0 en 40 liter per 100 km liggen";
+    }
+    writes.push(["consumptionPer100km", String(input.consumptionPer100km)]);
   }
   const e = input.email;
   if (e) {

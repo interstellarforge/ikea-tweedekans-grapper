@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ritje-check · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .trip {
+        padding: 14px 16px;
+      }
+      .trip header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        align-items: baseline;
+      }
+      .trip h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .net {
+        margin-left: auto;
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .net.good {
+        color: var(--good);
+      }
+      .net.bad {
+        color: var(--bad);
+      }
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin: 8px 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      ul.lines {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
+      }
+      ul.lines li {
+        display: flex;
+        gap: 10px;
+        padding: 4px 0;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      ul.lines .name {
+        flex: 1 1 220px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ritje-check</h1>
+      <p class="lead">
+        Per filiaal: is het de rit waard? Besparing t.o.v. nieuwprijs op de
+        producten uit je watchlist (aantal nodig per product), minus
+        brandstofkosten van de retour-rit.
+      </p>
+      <div id="summary" class="hint"></div>
+      <div id="trips"></div>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const { $, el, api, money, chip, empty, initShell } = App;
+      initShell("trips");
+
+      const trip = (t) => {
+        const lines = t.items.filter((i) => i.found > 0);
+        return el(
+          "section",
+          { className: "panel trip" },
+          el(
+            "header",
+            {},
+            el("h2", {
+              textContent: `${t.followed ? "★ " : ""}${t.storeName}`,
+            }),
+            chip(
+              t.worthIt
+                ? "Rit is de moeite waard"
+                : lines.length
+                  ? "Niet de moeite waard"
+                  : "Niets van je lijst aanwezig",
+              t.worthIt ? "good" : lines.length ? "bad" : "",
+            ),
+            el("span", {
+              className: `net ${t.worthIt ? "good" : "bad"}`,
+              textContent: lines.length
+                ? `${t.net >= 0 ? "+" : "−"}${money(Math.abs(t.net))}`
+                : "–",
+            }),
+          ),
+          el(
+            "div",
+            { className: "facts" },
+            el("span", {
+              textContent: `${t.oneWayKm} km enkele reis${t.distanceSource === "estimate" ? " (schatting)" : ""}`,
+            }),
+            el("span", {
+              textContent: `Ritkosten: ${money(t.tripCost)} (${t.roundTripKm} km)`,
+            }),
+            el("span", { textContent: `Besparing: ${money(t.saving)}` }),
+            el("span", { textContent: `Te betalen: ${money(t.spend)}` }),
+          ),
+          lines.length
+            ? el(
+                "ul",
+                { className: "lines" },
+                ...lines.map((i) =>
+                  el(
+                    "li",
+                    {},
+                    el("a", {
+                      className: "name",
+                      href: `/product/${i.articleNumber}`,
+                      textContent: i.name,
+                    }),
+                    el("span", { textContent: `${i.found} van ${i.wanted}` }),
+                    el("span", { textContent: money(i.spend) }),
+                    el("span", {
+                      className: "meta",
+                      textContent: i.saving
+                        ? `bespaart ${money(i.saving)}`
+                        : "nieuwprijs onbekend",
+                    }),
+                  ),
+                ),
+              )
+            : null,
+        );
+      };
+
+      (async () => {
+        $("summary").textContent = "Afstanden berekenen…";
+        let data;
+        try {
+          data = await api("/api/trips");
+        } catch (e) {
+          $("summary").textContent = "";
+          $("trips").replaceChildren(empty(`Berekenen mislukt: ${e.message}`));
+          return;
+        }
+        $("summary").textContent = "";
+        if (!data.configured) {
+          $("trips").replaceChildren(
+            el(
+              "div",
+              { className: "empty" },
+              `${data.reason}. `,
+              el("a", {
+                href: data.reason.includes("postcode")
+                  ? "/settings"
+                  : "/watchlist",
+                textContent: data.reason.includes("postcode")
+                  ? "Naar instellingen"
+                  : "Naar watchlist",
+              }),
+            ),
+          );
+          return;
+        }
+        $("summary").textContent =
+          `Vanaf ${data.postcode} · benzine ${money(data.fuelPrice)}/l · ${data.consumptionPer100km} l/100 km · ${data.wantedUnits} stuks nodig`;
+        $("trips").replaceChildren(...data.stores.map(trip));
+      })();
+    </script>
+  </body>
+</html>

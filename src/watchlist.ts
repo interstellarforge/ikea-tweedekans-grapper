@@ -5,6 +5,8 @@ import type { CatalogProduct } from "./ikea-client.ts";
 export type WatchItem = CatalogProduct & {
   addedAt: number;
   availableNow: number;
+  /** How many units are needed (used by the trip check). */
+  quantity: number;
 };
 
 export type Alert = {
@@ -52,7 +54,7 @@ export function listWatchItems(db: DatabaseSync): WatchItem[] {
   const rows = db
     .prepare(
       `SELECT w.article_number AS articleNumber, w.name, w.type_name AS typeName, w.measure,
-              w.image, w.url, w.added_at AS addedAt,
+              w.image, w.url, w.added_at AS addedAt, w.quantity,
               (SELECT COUNT(*) FROM offers o
                  WHERE o.article_number = w.article_number AND o.active = 1) AS availableNow
        FROM watch_items w ORDER BY w.added_at DESC`,
@@ -66,6 +68,16 @@ export function listWatchItems(db: DatabaseSync): WatchItem[] {
     image: r.image ?? undefined,
     url: r.url ?? undefined,
   }));
+}
+
+export function setQuantity(
+  db: DatabaseSync,
+  articleNumber: string,
+  quantity: number,
+): void {
+  db.prepare(
+    "UPDATE watch_items SET quantity = ? WHERE article_number = ?",
+  ).run(Math.min(Math.max(Math.round(quantity), 1), 99), articleNumber);
 }
 
 export function isWatched(db: DatabaseSync, articleNumber: string): boolean {
