@@ -629,7 +629,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   }
   const watch = db
     .prepare(
-      "SELECT article_number, name, type_name, quantity FROM watch_items",
+      "SELECT article_number, name, type_name, quantity - bought AS quantity FROM watch_items WHERE quantity > bought",
     )
     .all() as {
     article_number: string;
@@ -638,7 +638,18 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     quantity: number;
   }[];
   if (watch.length === 0) {
-    return { configured: false, reason: "Je watchlist is leeg" };
+    const total = (
+      db.prepare("SELECT COUNT(*) AS n FROM watch_items").get() as {
+        n: number;
+      }
+    ).n;
+    return {
+      configured: false,
+      reason:
+        total === 0
+          ? "Je watchlist is leeg"
+          : "Alles op je boodschappenlijst is al gehaald",
+    };
   }
   const home = await geocodePostcode(db, postcode);
   const offersStmt = db.prepare(

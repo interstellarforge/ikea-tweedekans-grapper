@@ -180,7 +180,34 @@
                 ),
               )
             : null,
+          lines.length
+            ? purchaseButton(
+                lines.map((i) => ({
+                  articleNumber: i.articleNumber,
+                  count: i.found,
+                })),
+              )
+            : null,
         );
+      };
+
+      /** Ticks the given units off the shopping list and recalculates. */
+      const purchaseButton = (units) => {
+        const btn = el("button", {
+          className: "secondary",
+          textContent: "Gehaald — afstrepen",
+        });
+        btn.onclick = async () => {
+          btn.disabled = true;
+          btn.textContent = "Afstrepen…";
+          try {
+            await send("/api/list/purchase", "POST", { items: units });
+            await render();
+          } catch (e) {
+            btn.textContent = e.message;
+          }
+        };
+        return btn;
       };
 
       const routePanel = (r, data) => {
@@ -248,13 +275,19 @@
                   {},
                   s.units.map((u) => `${u.count}× ${u.name}`).join(", "),
                 ),
+                purchaseButton(
+                  s.units.map((u) => ({
+                    articleNumber: u.articleNumber,
+                    count: u.count,
+                  })),
+                ),
               ),
             ),
           ),
         );
       };
 
-      (async () => {
+      async function render() {
         $("summary").textContent = "Afstanden berekenen…";
         let data;
         try {
@@ -274,10 +307,14 @@
               el("a", {
                 href: data.reason.includes("postcode")
                   ? "/settings"
-                  : "/watchlist",
+                  : data.reason.includes("gehaald")
+                    ? "/list"
+                    : "/watchlist",
                 textContent: data.reason.includes("postcode")
                   ? "Naar instellingen"
-                  : "Naar watchlist",
+                  : data.reason.includes("gehaald")
+                    ? "Naar boodschappenlijst"
+                    : "Naar watchlist",
               }),
             ),
           );
@@ -318,7 +355,8 @@
               ]
             : []),
         );
-      })();
+      }
+      render();
     </script>
   </body>
 </html>

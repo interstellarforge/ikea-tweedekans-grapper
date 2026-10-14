@@ -43,13 +43,16 @@ import {
   type SettingsInput,
   toPublic,
 } from "./settings.ts";
+import { parseShoppingList } from "./shopping-list.ts";
 import { computeTrips } from "./trips.ts";
 import {
   addWatchItem,
   listAlerts,
   listWatchItems,
   markAlertsSeen,
+  markPurchased,
   removeWatchItem,
+  setBought,
   setQuantity,
 } from "./watchlist.ts";
 
@@ -83,6 +86,7 @@ const PAGES: Record<string, string> = {
   "/catalog": "catalog.html",
   "/tweedekans": "tweedekans.html",
   "/alerts": "alerts.html",
+  "/list": "list.html",
   "/trips": "trips.html",
   "/settings": "settings.html",
 };
@@ -499,6 +503,96 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       }
       setQuantity(db, qtyMatch[1], body["quantity"]);
       send(res, 200, { ok: true });
+      return;
+    }
+
+    const boughtMatch = /^\/api\/watchlist\/(\d{8})\/bought$/.exec(path);
+    if (method === "PUT" && boughtMatch?.[1]) {
+      const body = await readJson(req);
+      if (typeof body["bought"] !== "number" || !(body["bought"] >= 0)) {
+        send(res, 400, { error: "bought must be a number >= 0" });
+        return;
+      }
+      setBought(db, boughtMatch[1], body["bought"]);
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === "POST" && path === "/api/list/purchase") {
+      const body = await readJson(req);
+      const items = Array.isArray(body["items"]) ? body["items"] : [];
+      markPurchased(
+        db,
+        items.flatMap((i: unknown) => {
+          const m = i as Record<string, unknown>;
+          return typeof m["articleNumber"] === "string" &&
+            typeof m["count"] === "number"
+            ? [{ articleNumber: m["articleNumber"], count: m["count"] }]
+            : [];
+        }),
+      );
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === "POST" && path === "/api/list/import") {
+      const body = await readJson(req);
+      const parsed = parseShoppingList(str(body["text"]));
+      if (parsed.length === 0) {
+        send(res, 400, { error: "Geen artikelnummers gevonden" });
+        return;
+      }
+      if (parsed.length > 200) {
+        send(res, 400, { error: "Maximaal 200 artikelen tegelijk" });
+        return;
+      }
+      const existing = new Map(
+        listWatchItems(db).map((w) => [w.articleNumber, w.quantity]),
+      );
+      let added = 0;
+      let updated = 0;
+      const unknown: string[] = [];
+      // Look product details up a few at a time.
+      for (let i = 0; i < parsed.length; i += 4) {
+        await Promise.all(
+          parsed.slice(i, i + 4).map(async (item) => {
+            const current = existing.get(item.articleNumber);
+            if (current !== undefined) {
+              // Importing the same list again must not double the quantities.
+              if (item.quantity > current) {
+                setQuantity(db, item.articleNumber, item.quantity);
+                updated += 1;
+              }
+              return;
+            }
+            let product: CatalogProduct | undefined;
+            try {
+              product = (await searchCatalog(item.articleNumber)).find(
+                (p) => p.articleNumber === item.articleNumber,
+              );
+            } catch {
+              product = undefined;
+            }
+            const fallback = offerProductInfo(db, item.articleNumber);
+            if (!product && !fallback) unknown.push(item.articleNumber);
+            addWatchItem(
+              db,
+              product ?? {
+                articleNumber: item.articleNumber,
+                name: fallback?.title ?? item.articleNumber,
+                typeName: fallback?.description ?? "",
+                measure: "",
+                image: fallback?.image,
+                url: undefined,
+              },
+              Date.now(),
+            );
+            setQuantity(db, item.articleNumber, item.quantity);
+            added += 1;
+          }),
+        );
+      }
+      send(res, 200, { added, updated, unknown });
       return;
     }
 

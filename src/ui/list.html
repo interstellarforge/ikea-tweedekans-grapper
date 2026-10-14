@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Boodschappenlijst · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .progress {
+        height: 10px;
+        background: var(--neutral-bg);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 8px 0 4px;
+      }
+      .progress > span {
+        display: block;
+        height: 100%;
+        background: var(--good);
+      }
+      .item {
+        display: grid;
+        grid-template-columns: auto 64px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+      }
+      .item:first-child {
+        border-top: 0;
+      }
+      .item img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 8px;
+        background: var(--neutral-bg);
+      }
+      .item.done {
+        opacity: 0.55;
+      }
+      .item.done .title {
+        text-decoration: line-through;
+      }
+      .item input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+      }
+      .counter {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .counter button {
+        padding: 2px 10px;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-end;
+      }
+      textarea {
+        width: 100%;
+        min-height: 110px;
+        font: inherit;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--fg);
+      }
+      @media (max-width: 640px) {
+        .item {
+          grid-template-columns: auto 52px 1fr;
+        }
+        .item .actions {
+          grid-column: 1 / -1;
+          flex-direction: row;
+          justify-content: space-between;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Boodschappenlijst</h1>
+      <p class="lead">
+        Alles wat je nodig hebt. Streep af wat je hebt (of gebruik "Afstrepen"
+        na een ritje op de Ritje-check): de Ritje-check en de meldingen rekenen
+        alleen met wat je nog nodig hebt.
+      </p>
+
+      <section class="panel">
+        <h2 style="margin-bottom: 4px">Voortgang</h2>
+        <div id="summary" class="hint"></div>
+        <div class="progress"><span id="bar" style="width: 0%"></span></div>
+      </section>
+
+      <details class="panel">
+        <summary><strong>Lijst plakken (bijv. een keukenbon)</strong></summary>
+        <p class="hint">
+          Eén product per regel met het artikelnummer (met of zonder punten),
+          optioneel met aantal: <code>2x 802.045.62</code>,
+          <code>90591705 x3</code>, <code>10557036 4 stuks</code>. Een lijst
+          opnieuw plakken telt aantallen niet dubbel.
+        </p>
+        <textarea
+          id="paste"
+          placeholder="2x 802.045.62&#10;90591705 x3&#10;10557036"
+        ></textarea>
+        <div class="row">
+          <button id="import">Toevoegen aan lijst</button>
+          <span id="importMsg" class="hint"></span>
+        </div>
+      </details>
+
+      <section class="panel">
+        <h2>Nog te halen</h2>
+        <div id="todo"></div>
+      </section>
+
+      <section class="panel" id="doneBox" hidden>
+        <h2>Gehaald</h2>
+        <div id="done"></div>
+      </section>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const { $, el, api, send, money, insightChips, empty, initShell } = App;
+      initShell("list");
+
+      async function setBought(item, bought) {
+        await send(`/api/watchlist/${item.articleNumber}/bought`, "PUT", {
+          bought,
+        });
+        load();
+      }
+
+      const row = (i) => {
+        const remaining = i.quantity - i.bought;
+        const done = remaining <= 0;
+        const check = el("input", {
+          type: "checkbox",
+          checked: done,
+          ariaLabel: "Afgestreept",
+        });
+        check.onchange = () => setBought(i, check.checked ? i.quantity : 0);
+
+        const minus = el("button", {
+          className: "secondary",
+          textContent: "−",
+          disabled: i.bought <= 0,
+        });
+        minus.onclick = () => setBought(i, i.bought - 1);
+        const plus = el("button", {
+          className: "secondary",
+          textContent: "+",
+          disabled: done,
+        });
+        plus.onclick = () => setBought(i, i.bought + 1);
+
+        const rm = el("button", {
+          className: "secondary",
+          textContent: "Van lijst",
+        });
+        rm.onclick = async () => {
+          await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
+          load();
+        };
+
+        const chips = done ? [] : insightChips(i.insight, 2);
+        return el(
+          "div",
+          { className: `item${done ? " done" : ""}` },
+          check,
+          el(
+            "a",
+            { href: `/product/${i.articleNumber}` },
+            el("img", { src: i.image || "", loading: "lazy", alt: "" }),
+          ),
+          el(
+            "div",
+            {},
+            el("a", {
+              className: "title",
+              href: `/product/${i.articleNumber}`,
+              style: "color:inherit;text-decoration:none;font-weight:700",
+              textContent: `${i.name} ${i.typeName}`.trim(),
+            }),
+            el("div", {
+              className: "meta",
+              textContent: `art. ${i.articleNumber}${i.measure ? " · " + i.measure : ""}`,
+            }),
+            ...(chips.length
+              ? chips
+              : done
+                ? []
+                : [
+                    el(
+                      "div",
+                      { className: "chips" },
+                      App.chip("Nu niet in de tweedekanshoek"),
+                    ),
+                  ]),
+          ),
+          el(
+            "div",
+            { className: "actions" },
+            el(
+              "span",
+              { className: "counter" },
+              minus,
+              el("strong", { textContent: `${i.bought} / ${i.quantity}` }),
+              plus,
+            ),
+            rm,
+          ),
+        );
+      };
+
+      async function load() {
+        const items = await api("/api/watchlist");
+        const todo = items.filter((i) => i.bought < i.quantity);
+        const done = items.filter((i) => i.bought >= i.quantity);
+        const units = items.reduce((n, i) => n + i.quantity, 0);
+        const got = items.reduce(
+          (n, i) => n + Math.min(i.bought, i.quantity),
+          0,
+        );
+        $("summary").textContent = items.length
+          ? `${got} van ${units} stuks gehaald · ${done.length} van ${items.length} producten klaar`
+          : "";
+        $("bar").style.width = units
+          ? `${Math.round((got / units) * 100)}%`
+          : "0%";
+        $("todo").replaceChildren(
+          ...(todo.length
+            ? todo.map(row)
+            : [
+                empty(
+                  items.length
+                    ? "Alles gehaald! 🎉"
+                    : "Je lijst is leeg. Plak een lijst hierboven of voeg producten toe via Zoeken in producten.",
+                ),
+              ]),
+        );
+        $("doneBox").hidden = done.length === 0;
+        $("done").replaceChildren(...done.map(row));
+      }
+
+      $("import").onclick = async () => {
+        $("import").disabled = true;
+        $("importMsg").className = "hint";
+        $("importMsg").textContent = "Producten opzoeken…";
+        try {
+          const r = await send("/api/list/import", "POST", {
+            text: $("paste").value,
+          });
+          $("importMsg").textContent =
+            `${r.added} toegevoegd, ${r.updated} bijgewerkt` +
+            (r.unknown.length
+              ? `, ${r.unknown.length} onbekend (alleen artikelnummer): ${r.unknown.join(", ")}`
+              : "");
+          $("paste").value = "";
+          load();
+        } catch (e) {
+          $("importMsg").className = "err";
+          $("importMsg").textContent = e.message;
+        } finally {
+          $("import").disabled = false;
+        }
+      };
+
+      load();
+      setInterval(() => {
+        if (document.activeElement?.tagName === "TEXTAREA") return;
+        load();
+      }, 60000);
+    </script>
+  </body>
+</html>

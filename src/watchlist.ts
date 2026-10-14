@@ -7,6 +7,8 @@ export type WatchItem = CatalogProduct & {
   availableNow: number;
   /** How many units are needed (used by the trip check). */
   quantity: number;
+  /** How many units were already picked up (shopping list). */
+  bought: number;
 };
 
 export type Alert = {
@@ -55,7 +57,7 @@ export function listWatchItems(db: DatabaseSync): WatchItem[] {
   const rows = db
     .prepare(
       `SELECT w.article_number AS articleNumber, w.name, w.type_name AS typeName, w.measure,
-              w.image, w.url, w.added_at AS addedAt, w.quantity,
+              w.image, w.url, w.added_at AS addedAt, w.quantity, w.bought,
               (SELECT COUNT(*) FROM offers o JOIN stores s ON s.store_id = o.store_id
                  WHERE o.article_number = w.article_number AND o.active = 1 AND s.enabled = 1) AS availableNow
        FROM watch_items w ORDER BY w.added_at DESC`,
@@ -81,10 +83,36 @@ export function setQuantity(
   ).run(Math.min(Math.max(Math.round(quantity), 1), 99), articleNumber);
 }
 
+export function setBought(
+  db: DatabaseSync,
+  articleNumber: string,
+  bought: number,
+): void {
+  db.prepare(
+    "UPDATE watch_items SET bought = MAX(0, MIN(quantity, ?)) WHERE article_number = ?",
+  ).run(Math.round(bought), articleNumber);
+}
+
+/** Ticks off units after a trip; never goes beyond the quantity needed. */
+export function markPurchased(
+  db: DatabaseSync,
+  items: { articleNumber: string; count: number }[],
+): void {
+  const stmt = db.prepare(
+    "UPDATE watch_items SET bought = MIN(quantity, bought + ?) WHERE article_number = ?",
+  );
+  for (const item of items) {
+    if (item.count >= 1) stmt.run(Math.round(item.count), item.articleNumber);
+  }
+}
+
+/** True while there is still something left to buy for this article. */
 export function isWatched(db: DatabaseSync, articleNumber: string): boolean {
   return (
     db
-      .prepare("SELECT 1 FROM watch_items WHERE article_number = ?")
+      .prepare(
+        "SELECT 1 FROM watch_items WHERE article_number = ? AND quantity > bought",
+      )
       .get(articleNumber) !== undefined
   );
 }

@@ -180,6 +180,11 @@ export function openDb(path: string): DatabaseSync {
   const watchCols = (
     db.prepare("PRAGMA table_info(watch_items)").all() as { name: string }[]
   ).map((c) => c.name);
+  if (!watchCols.includes("bought")) {
+    db.exec(
+      "ALTER TABLE watch_items ADD COLUMN bought INTEGER NOT NULL DEFAULT 0",
+    );
+  }
   if (!watchCols.includes("quantity")) {
     db.exec(
       "ALTER TABLE watch_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1",

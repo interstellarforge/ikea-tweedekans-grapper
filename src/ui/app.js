@@ -193,6 +193,7 @@ const App = (() => {
     ["watchlist", "/watchlist", "Watchlist"],
     ["catalog", "/catalog", "Zoeken in producten"],
     ["tweedekans", "/tweedekans", "Zoeken in tweedekanshoek"],
+    ["list", "/list", "Boodschappenlijst"],
     ["trips", "/trips", "Ritje-check"],
     ["alerts", "/alerts", "Meldingen"],
     ["settings", "/settings", "Instellingen"],

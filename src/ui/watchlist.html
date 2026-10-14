@@ -116,8 +116,15 @@
           );
           return;
         }
+        const open = items.filter((i) => i.bought < i.quantity);
+        if (!open.length) {
+          $("items").replaceChildren(
+            empty("Alles op je lijst is gehaald. Zie de Boodschappenlijst."),
+          );
+          return;
+        }
         $("items").replaceChildren(
-          ...items.map((i) => {
+          ...open.map((i) => {
             const rm = el("button", {
               className: "secondary",
               textContent: "Verwijderen",
@@ -181,6 +188,12 @@
                   : null,
                 el("div", { className: "spacer" }),
                 el("label", { className: "meta" }, "Aantal nodig: ", qty),
+                i.bought
+                  ? el("div", {
+                      className: "meta",
+                      textContent: `${i.bought} al gehaald, nog ${i.quantity - i.bought} nodig`,
+                    })
+                  : null,
                 rm,
               ),
             );
