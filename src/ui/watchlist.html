@@ -240,7 +240,7 @@
         <div class="row">
           <h2 style="margin: 0">Meldingen</h2>
           <button class="secondary" id="seen">Alles gezien</button>
-          <a href="/alerts" class="btn">Alle meldingen →</a>
+          <a href="/alerts" class="btn secondary">Alle meldingen</a>
         </div>
         <div id="alerts"></div>
       </section>
@@ -268,7 +268,12 @@
     <dialog id="pasteDialog" class="modal">
       <div class="head">
         <h2>Importeren</h2>
-        <button class="secondary" id="closeX" aria-label="Sluiten">✕</button>
+        <button
+          class="icon"
+          id="closeX"
+          aria-label="Sluiten"
+          title="Sluiten"
+        ></button>
       </div>
       <div class="body">
         <div id="pasteStep">
@@ -299,7 +304,12 @@
     <dialog id="buyDialog" class="modal">
       <div class="head">
         <h2>Gekocht</h2>
-        <button class="secondary" id="buyX" aria-label="Sluiten">✕</button>
+        <button
+          class="icon"
+          id="buyX"
+          aria-label="Sluiten"
+          title="Sluiten"
+        ></button>
       </div>
       <div class="body">
         <div class="buy-product">
@@ -312,11 +322,13 @@
         <div class="field-row">
           <label>Aantal gekocht</label>
           <div class="stepper">
-            <button class="secondary" id="buyMinus" aria-label="Minder">
-              −
-            </button>
+            <button
+              class="secondary"
+              id="buyMinus"
+              aria-label="Minder"
+            ></button>
             <strong id="buyCount">1</strong>
-            <button class="secondary" id="buyPlus" aria-label="Meer">+</button>
+            <button class="secondary" id="buyPlus" aria-label="Meer"></button>
           </div>
         </div>
         <div id="buyPieces"></div>
@@ -355,6 +367,7 @@
         confirmDialog,
         promptDialog,
         iconButton,
+        iconLabel,
         ikeaOfferUrl,
       } = App;
       const refreshShell = initShell("watchlist");
@@ -463,18 +476,26 @@
           need = el(
             "div",
             { className: "stepper" },
-            el("button", {
-              className: "secondary",
-              textContent: "−",
-              disabled: i.quantity <= 1,
-              onclick: () => set(i.quantity - 1),
-            }),
+            el(
+              "button",
+              {
+                className: "secondary",
+                ariaLabel: "Minder",
+                disabled: i.quantity <= 1,
+                onclick: () => set(i.quantity - 1),
+              },
+              App.icon("minus"),
+            ),
             el("strong", { textContent: String(i.quantity) }),
-            el("button", {
-              className: "secondary",
-              textContent: "+",
-              onclick: () => set(i.quantity + 1),
-            }),
+            el(
+              "button",
+              {
+                className: "secondary",
+                ariaLabel: "Meer",
+                onclick: () => set(i.quantity + 1),
+              },
+              App.icon("plus"),
+            ),
             el("span", { className: "meta", textContent: "nodig" }),
           );
         } else {
@@ -527,11 +548,14 @@
             el("div", { className: "spacer" }),
             need,
             i.needed > 0
-              ? el("button", {
-                  className: "secondary mini",
-                  textContent: "✓ Gekocht",
-                  onclick: () => openBuy(i),
-                })
+              ? el(
+                  "button",
+                  {
+                    className: "secondary mini",
+                    onclick: () => openBuy(i),
+                  },
+                  iconLabel("check", "Gekocht"),
+                )
               : null,
           ),
         );
@@ -567,8 +591,8 @@
         });
         const add = el("button", {
           className: "pill",
-          textContent: "＋ Nieuwe lijst",
         });
+        add.append(iconLabel("plus", "Nieuwe lijst"));
         add.onclick = async () => {
           const name = await promptDialog({
             title: "Nieuwe lijst",
@@ -614,11 +638,14 @@
           { className: "tools" },
           done
             ? null
-            : el("button", {
-                className: "secondary mini",
-                textContent: "✓ Gekocht",
-                onclick: () => openBuy(it, true),
-              }),
+            : el(
+                "button",
+                {
+                  className: "secondary mini",
+                  onclick: () => openBuy(it, true),
+                },
+                iconLabel("check", "Gekocht"),
+              ),
           iconButton(
             "eye",
             it.watched
@@ -649,18 +676,26 @@
         const qtyStep = el(
           "span",
           { className: "stepper" },
-          el("button", {
-            className: "secondary",
-            textContent: "−",
-            disabled: it.quantity <= Math.max(it.bought, 1),
-            onclick: () => setQty(it, it.quantity - 1),
-          }),
+          el(
+            "button",
+            {
+              className: "secondary",
+              ariaLabel: "Minder",
+              disabled: it.quantity <= Math.max(it.bought, 1),
+              onclick: () => setQty(it, it.quantity - 1),
+            },
+            App.icon("minus"),
+          ),
           el("strong", { textContent: String(it.quantity) }),
-          el("button", {
-            className: "secondary",
-            textContent: "+",
-            onclick: () => setQty(it, it.quantity + 1),
-          }),
+          el(
+            "button",
+            {
+              className: "secondary",
+              ariaLabel: "Meer",
+              onclick: () => setQty(it, it.quantity + 1),
+            },
+            App.icon("plus"),
+          ),
         );
 
         const purchases = it.purchases.length
@@ -853,7 +888,7 @@
             : [
                 empty(
                   list.items.length
-                    ? "Alles gekocht! 🎉"
+                    ? "Alles gekocht."
                     : 'Deze lijst is leeg. Gebruik "Importeren", of kies "Op lijst" bij Zoeken in producten.',
                 ),
               ]),
@@ -995,6 +1030,10 @@
         buyCount = Math.min(buyTarget.max, buyCount + 1);
         renderPieces();
       };
+      $("closeX").append(App.icon("close"));
+      $("buyX").append(App.icon("close"));
+      $("buyMinus").append(App.icon("minus"));
+      $("buyPlus").append(App.icon("plus"));
       $("buyX").onclick = () => buyDialog.close();
       $("buyCancel").onclick = () => buyDialog.close();
       $("buySave").onclick = async () => {

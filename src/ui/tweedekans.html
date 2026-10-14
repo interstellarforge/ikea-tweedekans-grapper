@@ -35,8 +35,8 @@
         </select>
         <select id="sort">
           <option value="new">Nieuwste eerst</option>
-          <option value="priceAsc">Prijs laag → hoog</option>
-          <option value="priceDesc">Prijs hoog → laag</option>
+          <option value="priceAsc">Prijs: laag naar hoog</option>
+          <option value="priceDesc">Prijs: hoog naar laag</option>
           <option value="discount">Grootste korting</option>
         </select>
       </div>
@@ -79,7 +79,7 @@
               el("h2", {
                 className: "group-title",
                 textContent: o.followed
-                  ? "★ Gevolgde filialen"
+                  ? "Gevolgde filialen"
                   : "Overige filialen",
               }),
             );
@@ -114,7 +114,7 @@
         $("store").append(
           ...[
             group(
-              "★ Gevolgde filialen",
+              "Gevolgde filialen",
               stores.filter((s) => s.followed),
             ),
             group(

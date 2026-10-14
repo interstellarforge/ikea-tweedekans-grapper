@@ -45,7 +45,7 @@
     </main>
     <script src="/assets/app.js"></script>
     <script>
-      const { $, el, api, send, money, empty, chip } = App;
+      const { $, el, api, send, money, empty, chip, iconLabel } = App;
       const refreshShell = App.initShell("alerts");
       const PAGE = 50;
       let offset = 0;
@@ -86,12 +86,15 @@
           el(
             "td",
             {},
-            el("a", {
-              href: App.ikeaOfferUrl(a.storeName, a.offerNumber, a.country),
-              target: "_blank",
-              rel: "noopener",
-              textContent: "IKEA ↗",
-            }),
+            el(
+              "a",
+              {
+                href: App.ikeaOfferUrl(a.storeName, a.offerNumber, a.country),
+                target: "_blank",
+                rel: "noopener",
+              },
+              iconLabel("external", "IKEA"),
+            ),
           ),
         );
 

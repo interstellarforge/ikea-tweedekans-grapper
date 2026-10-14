@@ -3,170 +3,158 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <title>Inloggen · IKEA Tweedekans</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z' fill='%23FFDB00'/%3E%3Ccircle cx='11.5' cy='16' r='2.3' fill='%230058A3'/%3E%3C/svg%3E"
+    />
     <link rel="stylesheet" href="/assets/app.css" />
-    <style>
-      body {
-        display: grid;
-        place-items: center;
-        min-height: 100vh;
-        padding: 16px;
-      }
-      .card-login {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 24px;
-        width: min(400px, 100%);
-      }
-      .brand {
-        display: block;
-        background: var(--brand);
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 18px;
-        text-align: center;
-        color: var(--accent);
-        font-weight: 800;
-        letter-spacing: 0.02em;
-      }
-      .switch {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        overflow: hidden;
-        margin-bottom: 16px;
-      }
-      .switch button {
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        color: var(--muted);
-        padding: 10px;
-      }
-      .switch button.active {
-        background: var(--brand);
-        color: #fff;
-        font-weight: 600;
-      }
-      label {
-        display: block;
-        margin: 12px 0 4px;
-        font-weight: 600;
-      }
-      input {
-        width: 100%;
-      }
-      form button[type="submit"] {
-        width: 100%;
-        margin-top: 18px;
-        padding: 11px;
-      }
-    </style>
   </head>
   <body>
-    <div class="card-login">
-      <span class="brand">IKEA TWEEDEKANS</span>
-      <div class="switch" id="switch" hidden>
-        <button type="button" id="tabLogin" class="active">Inloggen</button>
-        <button type="button" id="tabRegister">Account maken</button>
-      </div>
-      <form id="form">
-        <p class="hint" id="firstNote" hidden>
-          Er zijn nog geen accounts. Het eerste account wordt beheerder.
-        </p>
-        <label for="email">E-mailadres</label>
-        <input
-          type="email"
-          id="email"
-          autocomplete="username"
-          required
-          autofocus
-        />
-        <label for="password">Wachtwoord</label>
-        <input
-          type="password"
-          id="password"
-          autocomplete="current-password"
-          required
-          minlength="8"
-        />
-        <div id="againBox" hidden>
-          <label for="again">Herhaal wachtwoord</label>
-          <input
-            type="password"
-            id="again"
-            autocomplete="new-password"
-            minlength="8"
-          />
+    <div class="auth">
+      <aside class="auth-aside">
+        <a class="brand" href="/"
+          ><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z"
+              fill="#FFDB00"
+            />
+            <circle cx="11.5" cy="16" r="2.3" fill="#0058A3" />
+            <path
+              d="M17.5 12.5h7M17.5 16.5h7M17.5 20.5h4"
+              stroke="#0058A3"
+              stroke-width="2"
+              stroke-linecap="round"
+              fill="none"
+            /></svg
+          ><span>IKEA Tweedekans</span></a
+        >
+        <div>
+          <h2>Alle tweedekanshoeken, één lijst.</h2>
+          <ul>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16zM10 21h4" /></svg
+              ><span
+                >Melding zodra jouw product in een filiaal ligt dat je
+                volgt.</span
+              >
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M6 19a2 2 0 100-4 2 2 0 000 4zM18 9a2 2 0 100-4 2 2 0 000 4zM8 17h6a3 3 0 000-6h-4a3 3 0 010-6h6"
+                /></svg
+              ><span
+                >Ritje-check met brandstof, tijd en een route langs meerdere
+                filialen.</span
+              >
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg
+              ><span
+                >Lijsten, aankopen en instellingen zijn alleen van jou.</span
+              >
+            </li>
+          </ul>
         </div>
-        <button type="submit" id="submit">Inloggen</button>
-        <p class="err" id="msg" role="alert"></p>
-      </form>
+        <p class="fine">Onofficieel project, niet gelieerd aan IKEA.</p>
+      </aside>
+      <div class="auth-main">
+        <div class="auth-top">
+          <a class="brand" href="/"
+            ><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+              <path
+                d="M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z"
+                fill="#FFDB00"
+              />
+              <circle cx="11.5" cy="16" r="2.3" fill="#0058A3" />
+              <path
+                d="M17.5 12.5h7M17.5 16.5h7M17.5 20.5h4"
+                stroke="#0058A3"
+                stroke-width="2"
+                stroke-linecap="round"
+                fill="none"
+              /></svg
+            ><span>IKEA Tweedekans</span></a
+          >
+          <a class="back" href="/">Terug naar de startpagina</a>
+        </div>
+        <div class="auth-card">
+          <h1>Inloggen</h1>
+          <p class="lead">
+            Welkom terug. Log in om je lijsten en meldingen te zien.
+          </p>
+          <form id="form" novalidate>
+            <label for="email">E-mailadres</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              autocomplete="username"
+              inputmode="email"
+              required
+              autofocus
+            />
+            <label for="password">Wachtwoord</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autocomplete="current-password"
+              required
+            />
+            <button type="submit" id="submit">Inloggen</button>
+            <p class="err" id="msg" role="alert"></p>
+          </form>
+          <p class="alt" id="alt">
+            Nog geen account? <a href="/register">Account maken</a>
+          </p>
+        </div>
+      </div>
     </div>
     <script>
       const $ = (id) => document.getElementById(id);
-      let mode = "login";
-      let registrationOpen = false;
-
-      function setMode(next) {
-        mode = next;
-        const reg = mode === "register";
-        $("tabLogin").classList.toggle("active", !reg);
-        $("tabRegister").classList.toggle("active", reg);
-        $("againBox").hidden = !reg;
-        $("again").required = reg;
-        $("password").autocomplete = reg ? "new-password" : "current-password";
-        $("submit").textContent = reg ? "Account maken" : "Inloggen";
-        $("msg").textContent = "";
-      }
+      const next = new URLSearchParams(location.search).get("next");
+      const safeNext =
+        next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      if (next)
+        $("alt").querySelector("a").href =
+          "/register?next=" + encodeURIComponent(next);
 
       fetch("/api/auth/config")
         .then((r) => r.json())
         .then((c) => {
-          registrationOpen = c.registrationOpen;
-          $("switch").hidden = !registrationOpen;
-          if (c.firstAccount) {
-            $("firstNote").hidden = false;
-            setMode("register");
-          }
+          if (!c.registrationOpen) $("alt").hidden = true;
+          if (c.firstAccount) location.replace("/register");
         })
         .catch(() => {});
-
-      $("tabLogin").onclick = () => setMode("login");
-      $("tabRegister").onclick = () => setMode("register");
 
       $("form").onsubmit = async (e) => {
         e.preventDefault();
         $("msg").textContent = "";
-        if (mode === "register" && $("password").value !== $("again").value) {
-          $("msg").textContent = "De wachtwoorden komen niet overeen";
+        if (!$("email").value || !$("password").value) {
+          $("msg").textContent = "Vul je e-mailadres en wachtwoord in.";
           return;
         }
         $("submit").disabled = true;
         try {
-          const res = await fetch(
-            mode === "register" ? "/api/register" : "/api/login",
-            {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                email: $("email").value,
-                password: $("password").value,
-              }),
-            },
-          );
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              email: $("email").value,
+              password: $("password").value,
+            }),
+          });
           if (res.ok) {
-            const next = new URLSearchParams(location.search).get("next");
-            location.href =
-              next && next.startsWith("/") && !next.startsWith("//")
-                ? next
-                : "/";
+            location.href = safeNext === "/" ? "/watchlist" : safeNext;
             return;
           }
           $("msg").textContent =
-            (await res.json().catch(() => ({}))).error || "Mislukt";
+            (await res.json().catch(() => ({}))).error || "Inloggen mislukt";
         } finally {
           $("submit").disabled = false;
         }

@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Weet wanneer jouw IKEA-producten in de tweedekanshoek liggen en of de rit ernaartoe loont. Onofficieel hulpmiddel voor Nederland, België en Duitsland."
+    />
+    <title>IKEA Tweedekans · weet wanneer het er ligt</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z' fill='%23FFDB00'/%3E%3Ccircle cx='11.5' cy='16' r='2.3' fill='%230058A3'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      /* ---- landing: IKEA blue field, yellow action, price-tag numerals ---- */
+      body {
+        background: var(--surface);
+        overflow-x: clip;
+      }
+      .wrap {
+        max-width: 1140px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      .site-head {
+        background: var(--blue);
+        color: #fff;
+      }
+      .site-head .wrap {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 64px;
+      }
+      .site-head .links {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .site-head .links a:not(.btn) {
+        color: #fff;
+        text-decoration: none;
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        font-weight: 500;
+      }
+      .site-head .links a:not(.btn):hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .hero {
+        background: var(--blue);
+        color: #fff;
+        padding: 40px 0 72px;
+      }
+      .hero .wrap {
+        display: grid;
+        gap: 44px;
+        align-items: center;
+      }
+      .hero h1 {
+        font-size: clamp(34px, 6vw, 60px);
+        font-weight: 800;
+        line-height: 1.04;
+        letter-spacing: -0.025em;
+        max-width: 15ch;
+      }
+      .hero h1 span {
+        display: block;
+        color: var(--yellow);
+      }
+      .hero p.sub {
+        font-size: clamp(16px, 2.2vw, 19px);
+        line-height: 1.5;
+        max-width: 52ch;
+        margin: 22px 0 28px;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .hero .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .hero .actions a.btn.ghost {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.55);
+      }
+      .hero .actions a.btn.ghost:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: #fff;
+      }
+      .hero .fine {
+        margin: 18px 0 0;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      /* the demonstration object: a price tag with a notification overlapping it */
+      .stage {
+        position: relative;
+        padding: 0 0 56px;
+        max-width: 480px;
+        width: 100%;
+        justify-self: center;
+      }
+      .tag {
+        position: relative;
+        background: #fff;
+        color: #111a24;
+        border-radius: 14px;
+        padding: 26px 26px 22px 64px;
+        box-shadow:
+          0 2px 4px rgba(0, 0, 0, 0.18),
+          0 22px 44px rgba(0, 0, 0, 0.3);
+        transform: rotate(-1.6deg);
+      }
+      .tag::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 44px;
+        background: var(--yellow);
+        border-radius: 14px 0 0 14px;
+      }
+      .tag::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 24px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--blue);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+      .tag .state {
+        display: inline-block;
+        margin: 0 0 10px;
+        padding: 3px 9px;
+        font-size: 12px;
+        font-weight: 800;
+        border-radius: 999px;
+        background: var(--yellow);
+        color: #111a24;
+      }
+      .tag h2 {
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .tag .desc {
+        margin: 2px 0 14px;
+        color: #4a5562;
+        font-size: 15px;
+      }
+      .tag .priceline {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .tag .eur {
+        font-weight: 800;
+        font-size: 56px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+      .tag .eur sup {
+        font-size: 24px;
+        vertical-align: top;
+        position: relative;
+        top: 6px;
+        margin-left: 2px;
+        letter-spacing: 0;
+      }
+      .tag .was {
+        color: #5b6672;
+        text-decoration: line-through;
+        font-size: 16px;
+      }
+      .tag .where {
+        margin: 14px 0 0;
+        padding-top: 12px;
+        border-top: 1px solid #d9dfe7;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 14px;
+        color: #3a4552;
+      }
+      .tag .where b {
+        color: #111a24;
+      }
+      .toast {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 24px;
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        gap: 12px;
+        align-items: center;
+        background: #1b242e;
+        color: #fff;
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow:
+          0 2px 4px rgba(0, 0, 0, 0.25),
+          0 16px 36px rgba(0, 0, 0, 0.32);
+        transform: rotate(0.8deg);
+      }
+      .toast .ico-wrap {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: var(--yellow);
+        color: #111a24;
+        display: grid;
+        place-items: center;
+      }
+      .toast strong {
+        display: block;
+        font-size: 14px;
+        line-height: 1.3;
+      }
+      .toast span.sub {
+        font-size: 13px;
+        color: #aebbc9;
+      }
+      .sample {
+        position: absolute;
+        top: -12px;
+        right: 8px;
+        z-index: 2;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #003e75;
+        letter-spacing: 0.02em;
+      }
+
+      /* the one authored motion: the tag settles, the notification arrives */
+      @media (prefers-reduced-motion: no-preference) {
+        .tag {
+          animation: settle 0.9s var(--ease) both;
+        }
+        .toast {
+          animation: arrive 0.7s var(--ease) 0.55s both;
+        }
+        @keyframes settle {
+          from {
+            opacity: 0;
+            transform: translateY(26px) rotate(-5deg);
+          }
+        }
+        @keyframes arrive {
+          from {
+            opacity: 0;
+            transform: translateY(24px) rotate(0.8deg) scale(0.97);
+          }
+        }
+      }
+
+      /* ---- sections ---- */
+      section.block {
+        padding: 72px 0;
+      }
+      section.block h2.big {
+        font-size: clamp(26px, 4vw, 38px);
+        font-weight: 800;
+        line-height: 1.12;
+        letter-spacing: -0.02em;
+        max-width: 22ch;
+      }
+      .problem .cols {
+        display: grid;
+        gap: 28px 64px;
+        margin-top: 26px;
+      }
+      .problem p {
+        font-size: 18px;
+        line-height: 1.6;
+        color: var(--fg);
+        max-width: 56ch;
+      }
+      .problem p.muted {
+        color: var(--muted);
+      }
+
+      .steps {
+        background: var(--surface-2);
+        border-block: 1px solid var(--line);
+      }
+      .steps .intro {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 34px;
+      }
+      .steps .intro .sample-note {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      ol.sheet {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0;
+      }
+      ol.sheet > li {
+        display: grid;
+        gap: 18px 36px;
+        padding: 30px 0;
+        border-top: 2px solid var(--fg);
+      }
+      ol.sheet > li:last-child {
+        border-bottom: 2px solid var(--fg);
+      }
+      .step-no {
+        display: inline-grid;
+        place-items: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: var(--blue);
+        color: #fff;
+        font-weight: 800;
+        font-size: 22px;
+      }
+      ol.sheet h3 {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 12px 0 6px;
+      }
+      ol.sheet p {
+        color: var(--muted);
+        margin: 0;
+        max-width: 46ch;
+      }
+      .frag {
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-lg);
+        padding: 16px 18px;
+        box-shadow: var(--shadow-1);
+        max-width: 560px;
+        width: 100%;
+      }
+      .frag .row-line {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--line);
+        align-items: baseline;
+      }
+      .frag .row-line:last-of-type {
+        border-bottom: 0;
+      }
+      .frag .row-line small {
+        color: var(--muted);
+        display: block;
+      }
+      .frag .sum {
+        display: flex;
+        justify-content: space-between;
+        padding-top: 12px;
+        margin-top: 4px;
+        border-top: 2px solid var(--fg);
+        font-weight: 800;
+      }
+      .frag .sum span:last-child {
+        font-variant-numeric: tabular-nums;
+      }
+      .frag .saving {
+        margin-top: 6px;
+        color: var(--good);
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .frag.dark {
+        background: #1b242e;
+        color: #fff;
+        border-color: #1b242e;
+      }
+      .frag .head-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .frag .big-net {
+        font-size: 30px;
+        font-weight: 800;
+        color: var(--good);
+        font-variant-numeric: tabular-nums;
+      }
+      .frag .facts-line {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 4px 0 12px;
+      }
+      .frag .btns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .dot-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 15px;
+      }
+      .dot-row:last-child {
+        border-bottom: 0;
+      }
+      .dot-row .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--good);
+        flex: 0 0 auto;
+      }
+      .dot-row .t {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      dl.facts {
+        margin: 34px 0 0;
+        display: grid;
+        gap: 0;
+      }
+      dl.facts > div {
+        display: grid;
+        gap: 4px 40px;
+        padding: 20px 0;
+        border-top: 1px solid var(--line-strong);
+      }
+      dl.facts > div:last-child {
+        border-bottom: 1px solid var(--line-strong);
+      }
+      dl.facts dt {
+        font-weight: 800;
+        font-size: 17px;
+      }
+      dl.facts dd {
+        margin: 0;
+        color: var(--muted);
+        max-width: 62ch;
+      }
+
+      .trust {
+        background: var(--surface-2);
+        border-top: 1px solid var(--line);
+      }
+      .trust p {
+        max-width: 66ch;
+        font-size: 17px;
+      }
+
+      .closing {
+        background: var(--yellow);
+        color: #111a24;
+        padding: 64px 0;
+      }
+      .closing .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px 40px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .closing h2 {
+        font-size: clamp(26px, 4vw, 40px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        max-width: 20ch;
+      }
+      .closing .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .closing a.btn.dark {
+        background: #111a24;
+        border-color: #111a24;
+        color: #fff;
+      }
+      .closing a.btn.dark:hover {
+        background: #000;
+      }
+      .closing a.plain {
+        color: #111a24;
+        font-weight: 600;
+      }
+      footer.site {
+        background: var(--blue-strong);
+        color: rgba(255, 255, 255, 0.85);
+        padding: 26px 0;
+        font-size: 14px;
+      }
+      footer.site .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 28px;
+        justify-content: space-between;
+      }
+      footer.site a {
+        color: #fff;
+      }
+
+      @media (min-width: 900px) {
+        .hero .wrap {
+          grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+        }
+        .problem .cols {
+          grid-template-columns: 1fr 1fr;
+        }
+        ol.sheet > li {
+          grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+          align-items: center;
+        }
+        dl.facts > div {
+          grid-template-columns: 5fr 7fr;
+        }
+      }
+      @media (max-width: 560px) {
+        .site-head .links a.hide-sm,
+        .site-head .links a#loginLink {
+          display: none;
+        }
+        .tag {
+          padding-left: 58px;
+        }
+        .tag .eur {
+          font-size: 46px;
+        }
+        .hero {
+          padding: 28px 0 56px;
+        }
+        section.block {
+          padding: 52px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z"
+              fill="#FFDB00"
+            />
+            <circle cx="11.5" cy="16" r="2.3" fill="#0058A3" />
+            <path
+              d="M17.5 12.5h7M17.5 16.5h7M17.5 20.5h4"
+              stroke="#0058A3"
+              stroke-width="2"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
+          <span>IKEA Tweedekans</span>
+        </a>
+        <nav class="links" aria-label="Start">
+          <a class="hide-sm" href="#zo-werkt-het">Zo werkt het</a>
+          <a href="/login" id="loginLink">Inloggen</a>
+          <a class="btn yellow mini" href="/register" id="registerLink"
+            >Account maken</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <main style="padding: 0; max-width: none; margin: 0">
+      <section class="hero">
+        <div class="wrap">
+          <div>
+            <h1>
+              Weet wanneer jouw IKEA-spullen in de tweedekanshoek liggen.
+              <span>En of de rit ernaartoe loont.</span>
+            </h1>
+            <p class="sub">
+              Elk filiaal heeft zijn eigen tweedekanshoek en wat er ligt, is
+              snel weer weg. Zet je lijst erin: wij zoeken alle filialen in
+              Nederland, België en Duitsland af, melden het zodra het er ligt en
+              rekenen uit wat de rit kost.
+            </p>
+            <div class="actions">
+              <a class="btn yellow lg" href="/register" id="heroRegister"
+                >Gratis account maken</a
+              >
+              <a class="btn lg ghost" href="/login" id="heroLogin">Inloggen</a>
+            </div>
+            <p class="fine">Onofficieel project, niet gelieerd aan IKEA.</p>
+          </div>
+
+          <div
+            class="stage"
+            aria-label="Voorbeeld van een aanbieding en melding"
+          >
+            <span class="sample">Voorbeeld</span>
+            <div class="tag">
+              <span class="state">Tweedekans · goede staat</span>
+              <h2>METOD</h2>
+              <p class="desc">
+                Onderkast voor inbouwapparatuur, zwartgrijs, 60x60x80 cm
+              </p>
+              <div class="priceline">
+                <span class="eur">€36<sup>00</sup></span>
+                <span class="was">nieuw €52,00</span>
+              </div>
+              <div class="where">
+                <span><b>Breda</b> · art. 805.916.78</span>
+                <span>31% onder nieuwprijs</span>
+              </div>
+            </div>
+            <div
+              class="toast"
+              role="img"
+              aria-label="Melding: METOD ligt in Breda voor 36 euro"
+            >
+              <span class="ico-wrap">
+                <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16zM10 21h4" />
+                </svg>
+              </span>
+              <span>
+                <strong>METOD ligt in Breda voor €36,00!</strong>
+                <span class="sub">Tik om de aanbieding bij IKEA te openen</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block problem">
+        <div class="wrap">
+          <h2 class="big">De tweedekanshoek is een puzzel met veel hoeken.</h2>
+          <div class="cols">
+            <p>
+              Retouren, uitstalmodellen en teruggekochte meubels krijgen een
+              nieuwe prijs en staan per filiaal online. Wat je zoekt ligt zelden
+              in het filiaal dat je zelf als eerste checkt, en meestal blijft
+              het niet lang liggen.
+            </p>
+            <p class="muted">
+              Zelf elke dag tientallen filialen langs gaan kost meer tijd dan
+              het oplevert. En dan blijft de vraag: is een rit van een uur voor
+              één kast het geld waard? Hier is het antwoord op die vraag, met je
+              eigen verbruik en je eigen tijd erin.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block steps" id="zo-werkt-het">
+        <div class="wrap">
+          <div class="intro">
+            <h2 class="big">Van lijst tot rit, in vier stappen.</h2>
+            <span class="sample-note"
+              >Hieronder: voorbeeldgegevens, zo ziet het eruit.</span
+            >
+          </div>
+          <ol class="sheet">
+            <li>
+              <div>
+                <span class="step-no" aria-hidden="true">1</span>
+                <h3>Zet alles op je lijst</h3>
+                <p>
+                  Per ruimte een lijst: keuken, woonkamerkast, slaapkamer. Plak
+                  je artikelnummers of zoek ze op. Je ziet meteen wat het kost,
+                  tweedekans waar mogelijk, anders de nieuwprijs.
+                </p>
+              </div>
+              <div
+                class="frag"
+                role="img"
+                aria-label="Voorbeeld van een boodschappenlijst met totaal"
+              >
+                <div class="row-line">
+                  <span
+                    >KOMPLEMENT Plank <small>4 stuks · tweedekans</small></span
+                  ><strong>~€24,00</strong>
+                </div>
+                <div class="row-line">
+                  <span
+                    >METOD Onderkast <small>2 stuks · tweedekans</small></span
+                  ><strong>~€72,00</strong>
+                </div>
+                <div class="row-line">
+                  <span>SEKTION Frame <small>1 stuk · nieuwprijs</small></span
+                  ><strong>~€16,00</strong>
+                </div>
+                <div class="sum"><span>Totaal</span><span>~€112,00</span></div>
+                <div class="saving">€81,00 onder de nieuwprijs</div>
+              </div>
+            </li>
+            <li>
+              <div>
+                <span class="step-no" aria-hidden="true">2</span>
+                <h3>Wij houden alle filialen bij</h3>
+                <p>
+                  De aanbiedingen van alle filialen in Nederland, België en
+                  Duitsland worden centraal en regelmatig ververst, met de
+                  prijsgeschiedenis per artikel erbij.
+                </p>
+              </div>
+              <div
+                class="frag"
+                role="img"
+                aria-label="Voorbeeld van filialen met laatste ververstijd"
+              >
+                <div class="dot-row">
+                  <span class="dot"></span>Amsterdam<span class="t"
+                    >3 min geleden</span
+                  >
+                </div>
+                <div class="dot-row">
+                  <span class="dot"></span>Breda<span class="t"
+                    >4 min geleden</span
+                  >
+                </div>
+                <div class="dot-row">
+                  <span class="dot"></span>Eindhoven<span class="t"
+                    >4 min geleden</span
+                  >
+                </div>
+                <div class="dot-row">
+                  <span class="dot"></span>Zaventem (BE)<span class="t"
+                    >5 min geleden</span
+                  >
+                </div>
+              </div>
+            </li>
+            <li>
+              <div>
+                <span class="step-no" aria-hidden="true">3</span>
+                <h3>Je krijgt een melding</h3>
+                <p>
+                  Ligt iets van je lijst in een filiaal dat je volgt, dan hoor
+                  je het: via ntfy, e-mail of Home Assistant. Tikken opent
+                  precies die aanbieding bij IKEA.
+                </p>
+              </div>
+              <div
+                class="frag dark"
+                role="img"
+                aria-label="Voorbeeld van een melding"
+              >
+                <div class="head-line">
+                  <strong
+                    >Tweedekans: KOMPLEMENT ligt in Eindhoven voor
+                    €6,00!</strong
+                  >
+                </div>
+                <p class="facts-line" style="color: #aebbc9">
+                  Plank, 50x58 cm, eikenpatroon voor €6,00 — laagste prijs tot
+                  nu toe.
+                </p>
+                <div class="btns">
+                  <span class="chip info">Meldingen</span>
+                  <span class="chip info">Product</span>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div>
+                <span class="step-no" aria-hidden="true">4</span>
+                <h3>Check of de rit loont</h3>
+                <p>
+                  De ritje-check zet besparing tegenover brandstof en tijd, ook
+                  voor een route langs meerdere filialen. Je kijkt op de kaart
+                  of stuurt de route naar je telefoon.
+                </p>
+              </div>
+              <div
+                class="frag"
+                role="img"
+                aria-label="Voorbeeld van een rit met uitkomst"
+              >
+                <div class="head-line">
+                  <strong>Eindhoven via Breda</strong>
+                  <span class="chip good">Rendabel</span>
+                </div>
+                <div class="big-net">+€84,34</div>
+                <p class="facts-line">
+                  158,6 km · 2u 58m · brandstof €27,31 · besparing €111,65
+                </p>
+                <div class="btns">
+                  <span class="btn mini">Bekijk op kaart</span>
+                  <span class="btn mini">Naar mijn telefoon</span>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="wrap">
+          <h2 class="big">Wat erin zit.</h2>
+          <dl class="facts">
+            <div>
+              <dt>Alle filialen, centraal bijgehouden</dt>
+              <dd>
+                Nederland, België en Duitsland. Jij kiest welke landen je ziet
+                en welke filialen je volgt.
+              </dd>
+            </div>
+            <div>
+              <dt>Prijsgeschiedenis per artikel</dt>
+              <dd>
+                Zie de laagste prijs ooit gemeten en of een aanbieding duurder
+                of goedkoper is dan eerder.
+              </dd>
+            </div>
+            <div>
+              <dt>Meerdere boodschappenlijsten</dt>
+              <dd>
+                Importeer een lijst met artikelnummers, houd per stuk bij wat je
+                betaalde en zie een bon met totaal en besparing.
+              </dd>
+            </div>
+            <div>
+              <dt>Meldingen waar jij ze wilt</dt>
+              <dd>
+                Push via ntfy met een eigen persoonlijk adres, e-mail of Home
+                Assistant.
+              </dd>
+            </div>
+            <div>
+              <dt>Ritje-check met route en tijd</dt>
+              <dd>
+                Brandstof, rijtijd, tijd in de winkel en eventueel de waarde van
+                je tijd; een route langs meerdere filialen zonder te veel stuks
+                mee te nemen.
+              </dd>
+            </div>
+            <div>
+              <dt>Jouw gegevens zijn van jou</dt>
+              <dd>
+                Lijsten, aankopen en instellingen zijn persoonlijk. Alleen de
+                aanbiedingen en prijzen zijn gedeeld.
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="block trust">
+        <div class="wrap">
+          <h2 class="big">Onofficieel, en dat zeggen we er gewoon bij.</h2>
+          <p style="margin-top: 18px">
+            IKEA Tweedekans is een onafhankelijk hulpmiddel en niet gelieerd
+            aan, gesponsord door of goedgekeurd door IKEA. De aanbiedingen komen
+            uit de openbare tweedekansgegevens van IKEA. Reserveren en kopen doe
+            je altijd bij IKEA zelf. Bedragen met een ~ ervoor zijn schattingen.
+          </p>
+        </div>
+      </section>
+
+      <section class="closing">
+        <div class="wrap">
+          <h2>Zet je eerste lijst erin.</h2>
+          <div class="actions">
+            <a class="btn dark lg" href="/register" id="closingRegister"
+              >Gratis account maken</a
+            >
+            <a class="plain" href="/login" id="closingLogin"
+              >Ik heb al een account</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>IKEA Tweedekans · onofficieel, niet gelieerd aan IKEA.</span>
+        <span
+          ><a href="/login">Inloggen</a> ·
+          <a href="/register">Account maken</a></span
+        >
+      </div>
+    </footer>
+
+    <script>
+      // Signed-in visitors go straight to their lists instead of seeing sign-up buttons.
+      fetch("/api/profile", { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (!p) return;
+          const set = (id, text, href) => {
+            const a = document.getElementById(id);
+            if (!a) return;
+            a.textContent = text;
+            a.href = href;
+          };
+          set("loginLink", "Mijn lijsten", "/watchlist");
+          set("registerLink", "Open de app", "/watchlist");
+          set("heroRegister", "Naar mijn lijsten", "/watchlist");
+          set("heroLogin", "Ritje-check", "/trips");
+          set("closingRegister", "Naar mijn lijsten", "/watchlist");
+          set("closingLogin", "Ritje-check", "/trips");
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>

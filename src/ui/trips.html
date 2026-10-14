@@ -163,6 +163,7 @@
         initShell,
         duration,
         countryTag,
+        iconLabel,
       } = App;
       initShell("trips");
       const state = { hourlyRate: 0, postcode: "" };
@@ -179,7 +180,7 @@
             : "Niet de moeite waard";
       const signed = (n) => `${n >= 0 ? "+" : "−"}${money(Math.abs(n))}`;
       const storeLabel = (s) =>
-        `${s.followed ? "★ " : ""}${s.storeName}${countryTag(s.country)}`;
+        `${s.storeName}${countryTag(s.country)}${s.followed ? " (gevolgd)" : ""}`;
 
       /** Google Maps directions: home -> stops -> home. */
       const mapsUrl = (stops) => {
@@ -206,17 +207,17 @@
           href: url,
           target: "_blank",
           rel: "noopener",
-          textContent: "🗺 Bekijk op kaart",
         });
+        open.append(iconLabel("map", "Bekijk op kaart"));
         const share = el("button", {
           className: "secondary mini",
-          textContent: "📱 Naar mijn telefoon",
         });
+        share.append(iconLabel("phone", "Naar mijn telefoon"));
         share.onclick = async () => {
           share.disabled = true;
           try {
             await send("/api/trips/share", "POST", { url, title });
-            share.textContent = "✓ Verstuurd";
+            share.replaceChildren(iconLabel("check", "Verstuurd"));
           } catch (e) {
             share.textContent = e.message;
             share.disabled = false;
@@ -232,9 +233,9 @@
       ) => {
         const btn = el("button", {
           className: "secondary mini",
-          textContent: "✓ Gehaald",
           title,
         });
+        btn.append(iconLabel("check", "Gehaald"));
         btn.onclick = async () => {
           btn.disabled = true;
           try {

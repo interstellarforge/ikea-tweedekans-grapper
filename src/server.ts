@@ -135,6 +135,10 @@ const PAGES: Record<string, string> = {
 
 const PRODUCT_PAGE = "product.html";
 
+const FONT = readFileSync(
+  new URL("./ui/fonts/noto-sans-latin.woff2", import.meta.url),
+);
+
 const ASSETS: Record<string, { file: string; type: string }> = {
   "/assets/app.js": { file: "app.js", type: "text/javascript" },
 };
@@ -262,13 +266,38 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
       return;
     }
 
-    if (method === "GET" && path === "/login") {
+    if (method === "GET" && path === "/assets/fonts/noto-sans-latin.woff2") {
+      res.writeHead(200, {
+        "content-type": "font/woff2",
+        "cache-control": "public, max-age=31536000, immutable",
+        "x-content-type-options": "nosniff",
+      });
+      res.end(FONT);
+      return;
+    }
+
+    if (method === "GET" && path === "/") {
       if (user) {
-        res.writeHead(302, { location: "/" });
+        res.writeHead(302, { location: "/watchlist" });
         res.end();
         return;
       }
-      send(res, 200, uiFile("login.html"), "text/html");
+      send(res, 200, uiFile("landing.html"), "text/html");
+      return;
+    }
+
+    if (method === "GET" && (path === "/login" || path === "/register")) {
+      if (user) {
+        res.writeHead(302, { location: "/watchlist" });
+        res.end();
+        return;
+      }
+      send(
+        res,
+        200,
+        uiFile(path === "/login" ? "login.html" : "register.html"),
+        "text/html",
+      );
       return;
     }
 
@@ -358,7 +387,7 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
     // ------------------------------------------------------------ everything below needs a login
     if (!user) {
       if (method === "GET" && !path.startsWith("/api/")) {
-        const next = path === "/" ? "" : `?next=${encodeURIComponent(path)}`;
+        const next = `?next=${encodeURIComponent(path)}`;
         res.writeHead(302, { location: `/login${next}` });
         res.end();
         return;

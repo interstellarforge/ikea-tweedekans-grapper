@@ -69,8 +69,12 @@ const App = (() => {
     return `https://www.ikea.com/${path}/second-hand/buy-from-ikea/#/${slug}/${offerNumber}`;
   };
 
-  const chip = (text, kind = "") =>
-    el("span", { className: `chip ${kind}`, textContent: text });
+  const chip = (text, kind = "", iconName = "") => {
+    const span = el("span", { className: `chip ${kind}`.trim() });
+    if (iconName) span.append(icon(iconName));
+    span.append(document.createTextNode(text));
+    return span;
+  };
 
   /** "€2,50" without the space, for compact chips. */
   const moneyTight = (v, currency = "EUR") =>
@@ -117,8 +121,9 @@ const App = (() => {
           "div",
           { className: "chips" },
           chip(
-            `${g.followed ? "★ " : ""}${g.count > 1 ? g.count + "× " : ""}${g.storeName}${countryTag(g.country)} · ${money(g.price, g.currency)}`,
+            `${g.count > 1 ? g.count + "× " : ""}${g.storeName}${countryTag(g.country)} · ${money(g.price, g.currency)}`,
             g.followed ? "info" : "",
+            g.followed ? "star" : "",
           ),
           tagChip(g.tag),
         ),
@@ -174,8 +179,9 @@ const App = (() => {
           { className: "chips" },
           isNew ? chip("Nieuw", "new") : null,
           chip(
-            `${o.followed ? "★ " : ""}${o.storeName}${countryTag(o.country)}`,
+            `${o.storeName}${countryTag(o.country)}`,
             o.followed ? "info" : "",
+            o.followed ? "star" : "",
           ),
           o.condition ? chip(o.condition) : null,
           tagChip(o.tag),
@@ -194,7 +200,30 @@ const App = (() => {
     check: "M4 12l5 5L20 6",
     undo: "M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3",
     plus: "M12 5v14M5 12h14",
+    minus: "M5 12h14",
+    close: "M6 6l12 12M18 6L6 18",
+    menu: "M4 7h16M4 12h16M4 17h16",
     edit: "M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4",
+    star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z",
+    map: "M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14",
+    phone:
+      "M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2",
+    bell: "M18 16v-5a6 6 0 10-12 0v5l-2 2h16zM10 21h4",
+    sliders:
+      "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
+    user: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 3.6-6 8-6s8 2 8 6",
+    shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z",
+    logout: "M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
+    arrow: "M5 12h14M13 6l6 6-6 6",
+    external: "M14 4h6v6M20 4l-9 9M18 14v5H5V6h5",
+    list: "M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1",
+    route:
+      "M6 19a2 2 0 100-4 2 2 0 000 4zM18 9a2 2 0 100-4 2 2 0 000 4zM8 17h6a3 3 0 000-6h-4a3 3 0 010-6h6",
+    search: "M11 4a7 7 0 100 14 7 7 0 000-14zM16 16l5 5",
+    tag: "M3 12V4h8l9 9-8 8zM8 8h.01",
+    store:
+      "M4 9l1-5h14l1 5M4 9v11h16V9M4 9a2.7 2.7 0 005.3 0 2.7 2.7 0 005.4 0A2.7 2.7 0 0020 9M10 20v-5h4v5",
+    clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
   };
   /** Small inline SVG icon (24x24 viewBox). */
   const icon = (name) => {
@@ -218,6 +247,28 @@ const App = (() => {
     return b;
   };
 
+  /** Round-cornered close control for dialogs. */
+  const closeButton = ({ ariaLabel = "Sluiten", onclick }) => {
+    const b = el("button", {
+      className: "icon",
+      title: ariaLabel,
+      ariaLabel,
+    });
+    b.append(icon("close"));
+    b.onclick = onclick;
+    return b;
+  };
+
+  /** A node with an icon followed by text (never a glyph character). */
+  const iconLabel = (name, text) => {
+    const span = el("span", { className: "icon-label" });
+    span.append(icon(name), document.createTextNode(text));
+    span.style.display = "inline-flex";
+    span.style.alignItems = "center";
+    span.style.gap = "6px";
+    return span;
+  };
+
   /** Builds a modal dialog; returns { dlg, close }. Resolves nothing itself. */
   const makeModal = (title, bodyNodes, footNodes) => {
     const dlg = el("dialog", { className: "modal" });
@@ -229,9 +280,7 @@ const App = (() => {
         "div",
         { className: "head" },
         el("h2", { textContent: title }),
-        el("button", {
-          className: "secondary",
-          textContent: "✕",
+        closeButton({
           ariaLabel: "Sluiten",
           onclick: close,
         }),
@@ -335,7 +384,7 @@ const App = (() => {
       ...lists.map((l) =>
         el("option", { value: String(l.id), textContent: l.name }),
       ),
-      el("option", { value: "new", textContent: "＋ Nieuwe lijst…" }),
+      el("option", { value: "new", textContent: "Nieuwe lijst…" }),
     );
     const newName = el("input", {
       type: "text",
@@ -388,9 +437,7 @@ const App = (() => {
         "div",
         { className: "head" },
         el("h2", { textContent: "Op boodschappenlijst" }),
-        el("button", {
-          className: "secondary",
-          textContent: "✕",
+        closeButton({
           ariaLabel: "Sluiten",
           onclick: close,
         }),
@@ -438,32 +485,62 @@ const App = (() => {
 
   const NAV = [
     ["watchlist", "/watchlist", "Lijsten"],
-    ["catalog", "/catalog", "Zoeken in producten"],
-    ["tweedekans", "/tweedekans", "Zoeken in tweedekanshoek"],
+    ["catalog", "/catalog", "Producten"],
+    ["tweedekans", "/tweedekans", "Tweedekanshoek"],
     ["trips", "/trips", "Ritje-check"],
   ];
 
   const MENU = [
-    ["alerts", "/alerts", "Meldingen"],
-    ["settings", "/settings", "Instellingen"],
-    ["profile", "/profile", "Profiel"],
+    ["alerts", "/alerts", "Meldingen", "bell"],
+    ["settings", "/settings", "Instellingen", "sliders"],
+    ["profile", "/profile", "Profiel", "user"],
   ];
-  const ADMIN_ITEM = ["admin", "/admin", "Beheer"];
+  const ADMIN_ITEM = ["admin", "/admin", "Beheer", "shield"];
+
+  /** The brand mark: a yellow price tag with a blue eyelet. */
+  const brandMark = () => {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 32 32");
+    svg.setAttribute("class", "brand-mark");
+    svg.setAttribute("aria-hidden", "true");
+    const tag = document.createElementNS(ns, "path");
+    tag.setAttribute(
+      "d",
+      "M2.5 16 12 4.5h15a2.5 2.5 0 0 1 2.5 2.5v18a2.5 2.5 0 0 1-2.5 2.5H12z",
+    );
+    tag.setAttribute("fill", "#FFDB00");
+    const hole = document.createElementNS(ns, "circle");
+    hole.setAttribute("cx", "11.5");
+    hole.setAttribute("cy", "16");
+    hole.setAttribute("r", "2.3");
+    hole.setAttribute("fill", "#0058A3");
+    const line = document.createElementNS(ns, "path");
+    line.setAttribute("d", "M17.5 12.5h7M17.5 16.5h7M17.5 20.5h4");
+    line.setAttribute("stroke", "#0058A3");
+    line.setAttribute("stroke-width", "2");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("fill", "none");
+    svg.append(tag, hole, line);
+    return svg;
+  };
 
   const initShell = (active) => {
     const badge = el("span", { className: "count", hidden: true });
     const nav = el(
       "nav",
-      {},
+      { ariaLabel: "Hoofdmenu" },
       ...NAV.map(([key, href, label]) =>
-        el("a", { href, className: key === active ? "active" : "" }, label),
+        el("a", {
+          href,
+          className: key === active ? "active" : "",
+          textContent: label,
+          ariaCurrent: key === active ? "page" : undefined,
+        }),
       ),
     );
 
-    const initial = el("span", {
-      className: "avatar-letter",
-      textContent: "·",
-    });
+    const initial = el("span", { textContent: "·" });
     const avatar = el(
       "button",
       {
@@ -477,39 +554,40 @@ const App = (() => {
     );
     const menuBadge = el("span", { className: "count", hidden: true });
     const who = el("div", { className: "menu-who", textContent: "" });
-    const logout = el("button", {
-      className: "menu-item",
-      textContent: "Uitloggen",
-    });
+    const item = (href, label, iconName, extra = null) => {
+      const a = el("a", { href, className: "menu-item" });
+      a.append(icon(iconName), document.createTextNode(label));
+      if (extra) a.append(extra);
+      return a;
+    };
+    const logout = el("button", { className: "menu-item" });
+    logout.append(icon("logout"), document.createTextNode("Uitloggen"));
     logout.onclick = async () => {
       await fetch("/api/logout", { method: "POST" });
-      location.href = "/login";
+      location.href = "/";
     };
+    const mainItems = MENU.map(([key, href, label, iconName]) => {
+      const a = item(
+        href,
+        label,
+        iconName,
+        key === "alerts" ? menuBadge : null,
+      );
+      if (key === active) a.classList.add("active");
+      return a;
+    });
+    const adminLink = item(ADMIN_ITEM[1], ADMIN_ITEM[2], ADMIN_ITEM[3]);
+    adminLink.hidden = true;
+    if (active === "admin") adminLink.classList.add("active");
     const menu = el(
       "div",
       { className: "menu", role: "menu", hidden: true },
       who,
-      ...MENU.map(([key, href, label]) =>
-        el(
-          "a",
-          { href, className: `menu-item${key === active ? " active" : ""}` },
-          label,
-          key === "alerts" ? menuBadge : null,
-        ),
-      ),
+      ...mainItems,
+      adminLink,
       el("hr"),
       logout,
     );
-    const adminLink = el(
-      "a",
-      {
-        href: ADMIN_ITEM[1],
-        className: `menu-item${active === "admin" ? " active" : ""}`,
-        hidden: true,
-      },
-      ADMIN_ITEM[2],
-    );
-    menu.insertBefore(adminLink, menu.querySelector("hr"));
     const setOpen = (open) => {
       menu.hidden = !open;
       avatar.setAttribute("aria-expanded", String(open));
@@ -525,19 +603,47 @@ const App = (() => {
       if (e.key === "Escape") setOpen(false);
     });
 
-    document.body.prepend(
+    const brand = el("a", {
+      className: "brand",
+      href: "/",
+      title: "IKEA Tweedekans",
+    });
+    brand.append(brandMark(), el("span", {}, "IKEA Tweedekans"));
+    const burger = el("button", {
+      className: "burger",
+      ariaLabel: "Menu openen",
+      ariaExpanded: "false",
+    });
+    burger.append(icon("menu"));
+    const header = el(
+      "header",
+      { className: "shell" },
       el(
-        "header",
-        { className: "shell" },
-        el(
-          "div",
-          { className: "inner" },
-          el("a", { className: "brand", href: "/" }, "IKEA TWEEDEKANS"),
-          nav,
-          el("div", { className: "profile" }, avatar, menu),
-        ),
+        "div",
+        { className: "inner" },
+        brand,
+        nav,
+        el("div", { className: "profile" }, avatar, menu),
+        burger,
       ),
     );
+    const setNav = (open) => {
+      header.classList.toggle("nav-open", open);
+      burger.setAttribute("aria-expanded", String(open));
+      burger.setAttribute("aria-label", open ? "Menu sluiten" : "Menu openen");
+      burger.replaceChildren(icon(open ? "close" : "menu"));
+    };
+    burger.onclick = (e) => {
+      e.stopPropagation();
+      setNav(!header.classList.contains("nav-open"));
+    };
+    document.addEventListener("click", (e) => {
+      if (!header.contains(e.target)) setNav(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setNav(false);
+    });
+    document.body.prepend(header);
 
     api("/api/profile")
       .then((p) => {
@@ -594,6 +700,8 @@ const App = (() => {
     promptDialog,
     confirmDialog,
     icon,
+    closeButton,
+    iconLabel,
     iconButton,
     addToList,
     duration,

@@ -49,6 +49,7 @@
         empty,
         countryTag,
         addToList,
+        iconLabel,
       } = App;
       initShell("");
       const article = location.pathname.split("/").pop();
@@ -105,12 +106,15 @@
             el(
               "td",
               {},
-              el("a", {
-                href: ikeaOfferUrl(g.storeName, g.offerNumber, g.country),
-                target: "_blank",
-                rel: "noopener",
-                textContent: "Bekijk bij IKEA ↗",
-              }),
+              el(
+                "a",
+                {
+                  href: ikeaOfferUrl(g.storeName, g.offerNumber, g.country),
+                  target: "_blank",
+                  rel: "noopener",
+                },
+                iconLabel("external", "Bekijk bij IKEA"),
+              ),
             ),
           ),
         );
@@ -266,7 +270,7 @@
             ),
           ),
           offerSection(
-            "★ Gevolgde filialen",
+            "Gevolgde filialen",
             followed,
             "Niet beschikbaar in een gevolgd filiaal.",
           ),
