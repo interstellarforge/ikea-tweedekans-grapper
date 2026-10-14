@@ -50,20 +50,29 @@ async function getJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function fetchStores(): Promise<Store[]> {
+export async function fetchStores(country: string): Promise<Store[]> {
   const stores = await getJson<StoreDto[]>(
-    `${config.apiRoot}/api/public/stores/${config.country}`,
+    `${config.apiRoot}/api/public/stores/${country}`,
   );
   return stores
     .filter((s) => s.active)
-    .map((s) => ({ storeId: s.store_id, name: s.name.replace(/^IKEA /, "") }));
+    .map((s) => ({
+      storeId: s.store_id,
+      name: s.name
+        .replace(/^IKEA\s+/i, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    }));
 }
 
-export async function fetchStoreOffers(storeId: string): Promise<IkeaOffer[]> {
+export async function fetchStoreOffers(
+  storeId: string,
+  language: string,
+): Promise<IkeaOffer[]> {
   const offers: IkeaOffer[] = [];
   for (let page = 0, totalPages = 1; page < totalPages; page++) {
     const params = new URLSearchParams({
-      languageCode: config.language,
+      languageCode: language,
       storeIds: storeId,
       size: String(PAGE_SIZE),
       page: String(page),

@@ -45,6 +45,16 @@
         font-weight: 600;
         border-bottom-color: var(--brand);
       }
+      .warn {
+        background: var(--bad-bg);
+        color: var(--bad);
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin: 0 0 12px;
+      }
+      .warn[hidden] {
+        display: none;
+      }
       [data-tab][hidden] {
         display: none;
       }
@@ -105,6 +115,17 @@
 
       <div data-tab="filialen">
         <section class="panel">
+          <h2>Landen</h2>
+          <p class="hint">
+            Van welke landen worden tweedekansaanbiedingen opgehaald? België (8
+            filialen) en Duitsland (54 filialen) staan standaard uit; Duitsland
+            maakt het ophalen en de ritberekening merkbaar zwaarder. Meldingen
+            komen alleen uit filialen die je volgt.
+          </p>
+          <div class="stores" id="countryBoxes"></div>
+          <p class="hint" id="countryMsg"></p>
+        </section>
+        <section class="panel">
           <h2>Gevolgde filialen</h2>
           <p class="hint">
             Alle filialen worden opgehaald. Meldingen voor watchlist-producten
@@ -137,14 +158,39 @@
             <input type="number" id="fuelPrice" min="0.5" max="5" step="0.01" />
           </div>
           <div class="field">
-            <label for="maxStops">Max. filialen per rit</label>
-            <select id="maxStops">
-              <option value="1">1 (alleen enkele filialen)</option>
-              <option value="2">2 (rij naar A via B)</option>
-              <option value="3">3 (A via B naar C)</option>
-              <option value="4">4</option>
-            </select>
+            <label for="maxStops">Max. aantal stops (filialen) per rit</label>
+            <input type="number" id="maxStops" min="1" max="8" step="1" />
           </div>
+          <p class="warn" id="maxStopsWarn" hidden>
+            Let op: bij meer dan 4 stops wordt de volgorde met een snelle
+            benadering bepaald (niet gegarandeerd de kortste), het rekenen duurt
+            langer, en zo'n rit kost in de praktijk veel tijd.
+          </p>
+          <div class="field">
+            <label for="stopMinutes">Tijd per filiaal (minuten ophalen)</label>
+            <input type="number" id="stopMinutes" min="0" max="240" step="5" />
+          </div>
+          <div class="field">
+            <label for="hourlyRate">Waarde van je tijd (€ per uur)</label>
+            <input type="number" id="hourlyRate" min="0" max="500" step="1" />
+          </div>
+          <p class="hint">
+            Wordt van het nettovoordeel afgetrokken (rijden + tijd in de
+            winkel). Is een rit wel in geld rendabel maar niet meer na
+            tijdkosten, dan wordt hij oranje getoond. 0 = tijd negeren.
+          </p>
+          <div class="field">
+            <label for="routeAll">Routes langs filialen</label>
+            <span>
+              <input type="checkbox" id="routeAll" />
+              <label for="routeAll">
+                Routes mogen langs alle (niet-uitgesloten) filialen gaan
+              </label>
+            </span>
+          </div>
+          <p class="hint">
+            Uitgevinkt: routes gebruiken alleen filialen die je volgt.
+          </p>
           <div class="field">
             <label for="consumption">Verbruik (liter per 100 km)</label>
             <input type="number" id="consumption" min="1" max="40" step="0.1" />
@@ -458,6 +504,9 @@
           fuelPrice: Number($("fuelPrice").value),
           consumptionPer100km: Number($("consumption").value),
           maxStops: Number($("maxStops").value),
+          stopMinutes: Number($("stopMinutes").value),
+          hourlyRate: Number($("hourlyRate").value),
+          routeAllStores: $("routeAll").checked,
           email: emailPayload(),
           homeAssistant: {
             enabled: $("haEnabled").checked,
@@ -511,6 +560,10 @@
         }
       };
 
+      $("maxStops").oninput = () => {
+        $("maxStopsWarn").hidden = Number($("maxStops").value) <= 4;
+      };
+
       // Tabs (state in the URL hash)
       const TABS = ["filialen", "ritje", "meldingen", "status"];
       const showTab = () => {
@@ -536,6 +589,61 @@
         }
       };
 
+      const COUNTRY_NAMES = { nl: "Nederland", be: "België", de: "Duitsland" };
+      const COUNTRY_ORDER = ["nl", "be", "de"];
+
+      /** Renders `render(store)` per store, under a heading per country (only when several). */
+      const byCountry = (stores, render) => {
+        const countries = COUNTRY_ORDER.filter((c) =>
+          stores.some((s) => s.country === c),
+        );
+        return countries.flatMap((c) => [
+          ...(countries.length > 1
+            ? [
+                el("strong", {
+                  textContent: COUNTRY_NAMES[c],
+                  style: "grid-column: 1 / -1; margin-top: 8px",
+                }),
+              ]
+            : []),
+          ...stores.filter((s) => s.country === c).map(render),
+        ]);
+      };
+
+      async function loadCountries(enabled) {
+        $("countryBoxes").replaceChildren(
+          ...COUNTRY_ORDER.map((code) => {
+            const cb = el("input", {
+              type: "checkbox",
+              checked: enabled.includes(code),
+            });
+            cb.onchange = async () => {
+              const chosen = COUNTRY_ORDER.filter((c) =>
+                c === code
+                  ? cb.checked
+                  : [...$("countryBoxes").querySelectorAll("input")][
+                      COUNTRY_ORDER.indexOf(c)
+                    ].checked,
+              );
+              if (chosen.length === 0) {
+                cb.checked = true;
+                flash("countryMsg", "Minstens één land moet aan staan", true);
+                return;
+              }
+              try {
+                await send("/api/settings", "PUT", { countries: chosen });
+                await send("/api/sync", "POST");
+                flash("countryMsg", "Opgeslagen — filialen worden opgehaald…");
+                setTimeout(loadStores, 4000);
+              } catch (e) {
+                flash("countryMsg", e.message, true);
+              }
+            };
+            return el("label", {}, cb, ` ${COUNTRY_NAMES[code]}`);
+          }),
+        );
+      }
+
       async function loadStores() {
         const stores = await api("/api/stores");
         const box = (s) => {
@@ -548,7 +656,7 @@
           };
           return el("label", {}, cb, ` ${s.name}`);
         };
-        $("followBoxes").replaceChildren(...stores.map(box));
+        $("followBoxes").replaceChildren(...byCountry(stores, box));
         const tripBox = (s) => {
           const cb = el("input", {
             type: "checkbox",
@@ -563,14 +671,14 @@
         };
         // Only rebuild when not being edited, so a periodic refresh never flips a click.
         if (!$("tripBoxes").contains(document.activeElement)) {
-          $("tripBoxes").replaceChildren(...stores.map(tripBox));
+          $("tripBoxes").replaceChildren(...byCountry(stores, tripBox));
         }
 
         const row = (s) =>
           el(
             "tr",
             {},
-            el("td", { textContent: s.name }),
+            el("td", { textContent: s.name + App.countryTag(s.country) }),
             el("td", { textContent: s.activeOffers }),
             el("td", { textContent: ago(s.lastSynced) }),
             el("td", {
@@ -608,6 +716,7 @@
 
       (async () => {
         const s = await api("/api/settings");
+        loadCountries(s.countries);
         $("interval").value = s.pollIntervalMin;
         $("ntfy").value = s.ntfyUrl;
         $("appUrl").value = s.appUrl || location.origin;
@@ -615,6 +724,10 @@
         $("fuelPrice").value = s.fuelPrice;
         $("consumption").value = s.consumptionPer100km;
         $("maxStops").value = String(s.maxStops);
+        $("stopMinutes").value = String(s.stopMinutes);
+        $("hourlyRate").value = String(s.hourlyRate);
+        $("routeAll").checked = s.routeAllStores;
+        $("maxStopsWarn").hidden = s.maxStops <= 4;
         const e = s.email;
         $("mailEnabled").checked = e.enabled;
         $("host").value = e.host;

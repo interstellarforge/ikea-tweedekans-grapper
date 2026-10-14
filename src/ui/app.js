@@ -40,10 +40,24 @@ const App = (() => {
     return `${Math.round(m / 1440)} d geleden`;
   };
 
+  /** 135 -> "2u 15m", 40 -> "40 min". */
+  const duration = (minutes) => {
+    const m = Math.round(minutes);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    const rest = m % 60;
+    return rest ? `${h}u ${rest}m` : `${h}u`;
+  };
+
+  const COUNTRY_PATH = { nl: "nl/nl", be: "be/nl", de: "de/de" };
   const OFFERS_URL = "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/";
 
+  /** " (BE)" for stores outside the Netherlands, so duplicate-looking names stay clear. */
+  const countryTag = (country) =>
+    !country || country === "nl" ? "" : ` (${country.toUpperCase()})`;
+
   /** Deep link to one offer on IKEA's tweedekanshoek page. */
-  const ikeaOfferUrl = (storeName, offerNumber) => {
+  const ikeaOfferUrl = (storeName, offerNumber, country = "nl") => {
     const slug = storeName
       .toLowerCase()
       .replace(/ikea /g, "")
@@ -51,7 +65,8 @@ const App = (() => {
       .replace(/\//g, "")
       .replace(/-/g, "")
       .replace(/\s+/g, "+");
-    return `${OFFERS_URL}#/${slug}/${offerNumber}`;
+    const path = COUNTRY_PATH[country] ?? COUNTRY_PATH.nl;
+    return `https://www.ikea.com/${path}/second-hand/buy-from-ikea/#/${slug}/${offerNumber}`;
   };
 
   const chip = (text, kind = "") =>
@@ -103,7 +118,7 @@ const App = (() => {
           "div",
           { className: "chips" },
           chip(
-            `${g.followed ? "★ " : ""}${g.count > 1 ? g.count + "× " : ""}${g.storeName} · ${money(g.price, g.currency)}`,
+            `${g.followed ? "★ " : ""}${g.count > 1 ? g.count + "× " : ""}${g.storeName}${countryTag(g.country)} · ${money(g.price, g.currency)}`,
             g.followed ? "info" : "",
           ),
           tagChip(g.tag),
@@ -160,7 +175,7 @@ const App = (() => {
           { className: "chips" },
           isNew ? chip("Nieuw", "new") : null,
           chip(
-            `${o.followed ? "★ " : ""}${o.storeName}`,
+            `${o.followed ? "★ " : ""}${o.storeName}${countryTag(o.country)}`,
             o.followed ? "info" : "",
           ),
           o.condition ? chip(o.condition) : null,
@@ -255,6 +270,8 @@ const App = (() => {
     tagChip,
     insightChips,
     ikeaOfferUrl,
+    countryTag,
+    duration,
     groupOffers,
     offerCard,
     initShell,

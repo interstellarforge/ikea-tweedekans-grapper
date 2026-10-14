@@ -8,6 +8,7 @@ import {
   upsertStores,
 } from "./db.ts";
 import type { IkeaOffer } from "./ikea-client.ts";
+import { getSettings, saveSettings } from "./settings.ts";
 
 const offer = (
   offerNumber: string,
@@ -57,4 +58,29 @@ test("price tag compares with lowest price measured for other offers", () => {
   const after = articleInsights(db, ["12345678"])["12345678"];
   expect(after?.lowestEver).toBe(20);
   expect(after?.offers[0]?.tag).toEqual({ kind: "pricier", diff: 10, low: 20 });
+});
+
+test("offers of stores in disabled countries are hidden", () => {
+  const db = openDb(":memory:");
+  upsertStores(db, [{ storeId: "088", name: "Amsterdam" }], "nl");
+  upsertStores(db, [{ storeId: "376", name: "Zaventem" }], "be");
+  syncStoreOffers(db, "088", [offer("1", "KALLAX")], 1000);
+  syncStoreOffers(db, "376", [offer("2", "KALLAX", 10, "376")], 1000);
+  expect(searchOffers(db, {}).total).toBe(2);
+  const countries = (
+    articleInsights(db, ["12345678"])["12345678"]?.offers ?? []
+  )
+    .map((o) => o.country)
+    .sort();
+  expect(countries).toEqual(["be", "nl"]);
+
+  expect(saveSettings(db, { countries: ["nl"] })).toBeUndefined();
+  expect(searchOffers(db, {}).items.map((o) => o.storeId)).toEqual(["088"]);
+  expect(articleInsights(db, ["12345678"])["12345678"]?.offers).toHaveLength(1);
+
+  expect(saveSettings(db, { countries: ["nl", "be"] })).toBeUndefined();
+  expect(searchOffers(db, {}).total).toBe(2);
+  expect(saveSettings(db, { countries: [] })).toMatch(/minstens één land/);
+  expect(saveSettings(db, { countries: ["fr"] })).toMatch(/minstens één land/);
+  expect(getSettings(db).countries).toEqual(["nl", "be"]);
 });

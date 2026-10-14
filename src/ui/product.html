@@ -47,6 +47,7 @@
         ikeaOfferUrl,
         initShell,
         empty,
+        countryTag,
       } = App;
       initShell("");
       const article = location.pathname.split("/").pop();
@@ -72,7 +73,9 @@
             el(
               "td",
               {},
-              el("strong", { textContent: g.storeName }),
+              el("strong", {
+                textContent: g.storeName + countryTag(g.country),
+              }),
               g.count > 1
                 ? el("span", { className: "meta", textContent: ` ×${g.count}` })
                 : null,
@@ -102,7 +105,7 @@
               "td",
               {},
               el("a", {
-                href: ikeaOfferUrl(g.storeName, g.offerNumber),
+                href: ikeaOfferUrl(g.storeName, g.offerNumber, g.country),
                 target: "_blank",
                 rel: "noopener",
                 textContent: "Bekijk bij IKEA ↗",
@@ -219,7 +222,7 @@
                 ),
                 cheapest
                   ? chip(
-                      `Laagste nu: ${money(cheapest.price, cheapest.currency)} in ${cheapest.storeName}`,
+                      `Laagste nu: ${money(cheapest.price, cheapest.currency)} in ${cheapest.storeName}${countryTag(cheapest.country)}`,
                       "good",
                     )
                   : null,
@@ -244,10 +247,11 @@
                       href: ikeaOfferUrl(
                         cheapest.storeName,
                         cheapest.offerNumber,
+                        cheapest.country,
                       ),
                       target: "_blank",
                       rel: "noopener",
-                      textContent: `Goedkoopste aanbieding bij IKEA (${cheapest.storeName}) ↗`,
+                      textContent: `Goedkoopste aanbieding bij IKEA (${cheapest.storeName}${countryTag(cheapest.country)}) ↗`,
                     })
                   : null,
               ),

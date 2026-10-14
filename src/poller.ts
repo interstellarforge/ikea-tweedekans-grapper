@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { COUNTRIES, isCountry } from "./countries.ts";
 import {
   articleInsights,
   isFollowed,
@@ -34,12 +35,16 @@ export async function pollStore(
   storeId: string,
 ): Promise<number> {
   try {
-    const offers = await fetchStoreOffers(storeId);
+    const store = listStores(db, { includeDisabled: true }).find(
+      (st) => st.storeId === storeId,
+    );
+    const country = store?.country ?? "nl";
+    const language = isCountry(country) ? COUNTRIES[country].apiLanguage : "nl";
+    const offers = await fetchStoreOffers(storeId, language);
     const now = Date.now();
     const added = syncStoreOffers(db, storeId, offers, now);
     if (!isFollowed(db, storeId)) return added.length;
-    const storeName =
-      listStores(db).find((s) => s.storeId === storeId)?.name ?? storeId;
+    const storeName = store?.name ?? storeId;
     for (const o of added) {
       if (!o.articleNumber || !isWatched(db, o.articleNumber)) continue;
       const tag = articleInsights(db, [o.articleNumber])[
@@ -57,6 +62,7 @@ export async function pollStore(
         storeName,
         createdAt: now,
         seen: false,
+        country,
         note: tagText(tag),
         delivery: "",
       };
@@ -78,10 +84,15 @@ export async function pollAll(db: DatabaseSync): Promise<void> {
   pollStatus.running = true;
   pollStatus.startedAt = Date.now();
   try {
-    try {
-      upsertStores(db, await fetchStores());
-    } catch (error) {
-      console.error("[poll] store list failed:", errorMessage(error));
+    for (const country of getSettings(db).countries) {
+      try {
+        upsertStores(db, await fetchStores(country), country);
+      } catch (error) {
+        console.error(
+          `[poll] store list (${country}) failed:`,
+          errorMessage(error),
+        );
+      }
     }
     for (const store of listStores(db)) {
       try {

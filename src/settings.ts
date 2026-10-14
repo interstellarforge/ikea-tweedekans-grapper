@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { config } from "./config.ts";
+import { COUNTRY_CODES, DEFAULT_COUNTRIES, isCountry } from "./countries.ts";
 import { decryptSecret, encryptSecret } from "./secrets.ts";
 
 export type EmailSettings = {
@@ -26,6 +27,8 @@ export type HomeAssistantSettings = {
 };
 
 export type Settings = {
+  /** Enabled countries (stores of other countries are not fetched or shown). */
+  countries: string[];
   pollIntervalMin: number;
   ntfyUrl: string;
   /** Public base URL of this app (no trailing slash); used for deep links in notifications. */
@@ -36,8 +39,14 @@ export type Settings = {
   fuelPrice: number;
   /** Car consumption in litres per 100 km. */
   consumptionPer100km: number;
-  /** Maximum number of stores combined in one trip (1-4). */
+  /** Maximum number of stores combined in one trip (1-8). */
   maxStops: number;
+  /** Minutes spent inside each store for picking up. */
+  stopMinutes: number;
+  /** Value of one hour of your time in EUR (0 = ignore time). */
+  hourlyRate: number;
+  /** Routes may pass along all (non-excluded) stores; otherwise only followed stores. */
+  routeAllStores: boolean;
   email: EmailSettings;
   homeAssistant: HomeAssistantSettings;
 };
@@ -49,6 +58,7 @@ export type PublicSettings = Omit<Settings, "email" | "homeAssistant"> & {
 };
 
 export type SettingsInput = {
+  countries?: string[];
   pollIntervalMin?: number;
   ntfyUrl?: string;
   appUrl?: string;
@@ -56,11 +66,15 @@ export type SettingsInput = {
   fuelPrice?: number;
   consumptionPer100km?: number;
   maxStops?: number;
+  stopMinutes?: number;
+  hourlyRate?: number;
+  routeAllStores?: boolean;
   email?: Partial<EmailSettings>;
   homeAssistant?: Partial<HomeAssistantSettings>;
 };
 
 const defaults = (): Settings => ({
+  countries: DEFAULT_COUNTRIES,
   pollIntervalMin: config.pollIntervalMin,
   ntfyUrl: config.ntfyUrl ?? "",
   appUrl: process.env["APP_URL"] ?? "",
@@ -68,6 +82,9 @@ const defaults = (): Settings => ({
   fuelPrice: 2.1,
   consumptionPer100km: 7,
   maxStops: 3,
+  stopMinutes: 20,
+  hourlyRate: 0,
+  routeAllStores: true,
   email: {
     enabled: false,
     host: "",
@@ -91,13 +108,26 @@ export function getSettings(db: DatabaseSync): Settings {
   const interval = Number(map.get("pollIntervalMin"));
   const port = Number(map.get("email.port"));
   return {
+    countries: parseCountries(map.get("countries")),
     pollIntervalMin: interval > 0 ? interval : d.pollIntervalMin,
     ntfyUrl: map.get("ntfyUrl") ?? d.ntfyUrl,
     appUrl: map.get("appUrl") ?? d.appUrl,
     homePostcode: map.get("homePostcode") ?? d.homePostcode,
-    maxStops: [1, 2, 3, 4].includes(Number(map.get("maxStops")))
-      ? Number(map.get("maxStops"))
-      : d.maxStops,
+    maxStops:
+      Number(map.get("maxStops")) >= 1 && Number(map.get("maxStops")) <= 8
+        ? Math.round(Number(map.get("maxStops")))
+        : d.maxStops,
+    stopMinutes:
+      map.has("stopMinutes") && Number(map.get("stopMinutes")) >= 0
+        ? Number(map.get("stopMinutes"))
+        : d.stopMinutes,
+    hourlyRate:
+      map.has("hourlyRate") && Number(map.get("hourlyRate")) >= 0
+        ? Number(map.get("hourlyRate"))
+        : d.hourlyRate,
+    routeAllStores: map.has("routeAllStores")
+      ? map.get("routeAllStores") === "1"
+      : d.routeAllStores,
     fuelPrice:
       Number(map.get("fuelPrice")) > 0
         ? Number(map.get("fuelPrice"))
@@ -123,6 +153,21 @@ export function getSettings(db: DatabaseSync): Settings {
       targets: parseTargets(map.get("ha.targets")),
     },
   };
+}
+
+function parseCountries(raw: string | undefined): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw ?? "null");
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter(
+        (c): c is string => typeof c === "string" && isCountry(c),
+      );
+      if (valid.length > 0) return valid;
+    }
+  } catch {
+    // fall through to default
+  }
+  return DEFAULT_COUNTRIES;
 }
 
 function parseTargets(raw: string | undefined): string[] {
@@ -159,6 +204,15 @@ export function saveSettings(
   );
   const writes: [string, string][] = [];
 
+  let countriesChanged: string[] | undefined;
+  if (input.countries !== undefined) {
+    const unique = [...new Set(input.countries)];
+    if (unique.length === 0 || !unique.every((c) => isCountry(c))) {
+      return `Kies minstens één land (${COUNTRY_CODES.join(", ")})`;
+    }
+    writes.push(["countries", JSON.stringify(unique)]);
+    countriesChanged = unique;
+  }
   if (input.pollIntervalMin !== undefined) {
     if (!(input.pollIntervalMin >= 5 && input.pollIntervalMin <= 1440)) {
       return "Interval moet tussen 5 en 1440 minuten liggen";
@@ -187,10 +241,29 @@ export function saveSettings(
     writes.push(["homePostcode", pc.replace(/\s+/g, "").toUpperCase()]);
   }
   if (input.maxStops !== undefined) {
-    if (![1, 2, 3, 4].includes(input.maxStops)) {
-      return "Aantal filialen per rit moet tussen 1 en 4 liggen";
+    if (
+      !Number.isInteger(input.maxStops) ||
+      input.maxStops < 1 ||
+      input.maxStops > 8
+    ) {
+      return "Aantal filialen per rit moet tussen 1 en 8 liggen";
     }
     writes.push(["maxStops", String(input.maxStops)]);
+  }
+  if (input.stopMinutes !== undefined) {
+    if (!(input.stopMinutes >= 0 && input.stopMinutes <= 240)) {
+      return "Tijd per filiaal moet tussen 0 en 240 minuten liggen";
+    }
+    writes.push(["stopMinutes", String(Math.round(input.stopMinutes))]);
+  }
+  if (input.hourlyRate !== undefined) {
+    if (!(input.hourlyRate >= 0 && input.hourlyRate <= 500)) {
+      return "Uurtarief moet tussen 0 en 500 euro liggen";
+    }
+    writes.push(["hourlyRate", String(input.hourlyRate)]);
+  }
+  if (input.routeAllStores !== undefined) {
+    writes.push(["routeAllStores", input.routeAllStores ? "1" : "0"]);
   }
   if (input.fuelPrice !== undefined) {
     if (!(input.fuelPrice > 0 && input.fuelPrice < 10)) {
@@ -264,6 +337,14 @@ export function saveSettings(
   db.exec("BEGIN");
   try {
     for (const [k, v] of writes) put.run(k, v);
+    if (countriesChanged) {
+      // stores of disabled countries drop out of every listing, search and trip calculation
+      db.prepare("UPDATE stores SET enabled = 0").run();
+      const mark = db.prepare(
+        "UPDATE stores SET enabled = 1 WHERE country = ?",
+      );
+      for (const c of countriesChanged) mark.run(c);
+    }
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

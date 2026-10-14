@@ -12,6 +12,8 @@
   --good-bg: #dcf5e3;
   --bad: #b3261e;
   --bad-bg: #fde4e1;
+  --warn: #b25e00;
+  --warn-bg: #ffe9cc;
   --info: #0058a3;
   --info-bg: #dcebfa;
   --neutral-bg: #ececec;
@@ -28,6 +30,8 @@
     --good-bg: #12351c;
     --bad: #ff8a80;
     --bad-bg: #3d1a17;
+    --warn: #ffb454;
+    --warn-bg: #3d2a10;
     --info: #8ec1ff;
     --info-bg: #14283d;
     --neutral-bg: #2a2a2a;
@@ -321,5 +325,26 @@ a.btn {
   display: none;
 }
 .banner-good strong {
+  font-weight: 800;
+}
+.chip.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.banner-warn {
+  display: block;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+  text-decoration: none;
+  line-height: 1.5;
+}
+.banner-warn[hidden] {
+  display: none;
+}
+.banner-warn strong {
   font-weight: 800;
 }

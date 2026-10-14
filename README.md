@@ -2,7 +2,7 @@
 
 LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, search them, see what's new.
 
-- Data: IKEA's public as-is API (`web-api.ikea.com/circular/circular-asis`), polled per followed store.
+- Data: IKEA's public as-is API (`web-api.ikea.com/circular/circular-asis`), polled for all stores of the enabled countries (NL on by default; BE and DE optional in `/settings`).
 - Stack: Node >=22.18 (native TS + `node:sqlite`), no runtime deps. DB: `data/tweedekans.db`.
 
 ## Run

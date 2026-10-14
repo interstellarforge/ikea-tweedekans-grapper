@@ -224,7 +224,11 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
     }
 
     if (method === "GET" && path === "/api/stores") {
-      if (listStores(db).length === 0) upsertStores(db, await fetchStores());
+      if (listStores(db).length === 0) {
+        for (const country of getSettings(db).countries) {
+          upsertStores(db, await fetchStores(country), country);
+        }
+      }
       send(res, 200, listStores(db));
       return;
     }
@@ -257,12 +261,26 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
         input.pollIntervalMin = body["pollIntervalMin"];
       }
       if (typeof body["ntfyUrl"] === "string") input.ntfyUrl = body["ntfyUrl"];
+      if (Array.isArray(body["countries"])) {
+        input.countries = body["countries"].filter(
+          (c): c is string => typeof c === "string",
+        );
+      }
       if (typeof body["appUrl"] === "string") input.appUrl = body["appUrl"];
       if (typeof body["homePostcode"] === "string") {
         input.homePostcode = body["homePostcode"];
       }
       if (typeof body["maxStops"] === "number") {
         input.maxStops = body["maxStops"];
+      }
+      if (typeof body["hourlyRate"] === "number") {
+        input.hourlyRate = body["hourlyRate"];
+      }
+      if (typeof body["stopMinutes"] === "number") {
+        input.stopMinutes = body["stopMinutes"];
+      }
+      if (typeof body["routeAllStores"] === "boolean") {
+        input.routeAllStores = body["routeAllStores"];
       }
       if (typeof body["fuelPrice"] === "number") {
         input.fuelPrice = body["fuelPrice"];

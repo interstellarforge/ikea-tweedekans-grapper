@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import nodemailer from "nodemailer";
 
-import { config } from "./config.ts";
+import { COUNTRIES, isCountry } from "./countries.ts";
 import type { PriceTag } from "./insights.ts";
 import {
   type EmailSettings,
@@ -11,7 +11,10 @@ import {
 } from "./settings.ts";
 import type { Alert } from "./watchlist.ts";
 
-const OFFERS_URL = `https://www.ikea.com/${config.country}/${config.language}/second-hand/buy-from-ikea/`;
+const offersBase = (country = "nl"): string =>
+  `https://www.ikea.com/${isCountry(country) ? COUNTRIES[country].ikeaPath : COUNTRIES.nl.ikeaPath}/second-hand/buy-from-ikea/`;
+
+const OFFERS_URL = offersBase();
 
 const euro = (n: number): string => `€${n.toFixed(2).replace(".", ",")}`;
 const ascii = (s: string): string =>
@@ -50,16 +53,24 @@ export const storeSlug = (storeName: string): string =>
     .replace(/\s+/g, "+");
 
 /** Deep link to one offer on IKEA's tweedekanshoek page. */
-export const ikeaOfferUrl = (storeName: string, offerNumber: string): string =>
-  `${OFFERS_URL}#/${storeSlug(storeName)}/${offerNumber}`;
+export const ikeaOfferUrl = (
+  storeName: string,
+  offerNumber: string,
+  country = "nl",
+): string => `${offersBase(country)}#/${storeSlug(storeName)}/${offerNumber}`;
 
 /** Tap target and buttons for an alert; the in-app buttons need the public app URL. */
 export function alertLinks(
   appUrl: string,
-  offer?: { storeName: string; offerNumber: string; articleNumber: string },
+  offer?: {
+    storeName: string;
+    offerNumber: string;
+    articleNumber: string;
+    country?: string;
+  },
 ): NtfyLinks {
   const click = offer
-    ? ikeaOfferUrl(offer.storeName, offer.offerNumber)
+    ? ikeaOfferUrl(offer.storeName, offer.offerNumber, offer.country)
     : appUrl
       ? `${appUrl}/alerts`
       : OFFERS_URL;
@@ -222,9 +233,9 @@ export function testContent(
 ): { title: string; body: string; links: NtfyLinks } {
   const row = db
     .prepare(
-      `SELECT o.title, o.description, o.price, o.offer_number, o.article_number, s.name
+      `SELECT o.title, o.description, o.price, o.offer_number, o.article_number, s.name, s.country
        FROM offers o JOIN stores s ON s.store_id = o.store_id
-       WHERE o.active = 1 AND o.article_number IS NOT NULL
+       WHERE o.active = 1 AND s.enabled = 1 AND o.article_number IS NOT NULL
        ORDER BY s.followed DESC, o.last_seen DESC LIMIT 1`,
     )
     .get() as
@@ -235,6 +246,7 @@ export function testContent(
         offer_number: string;
         article_number: string;
         name: string;
+        country: string;
       }
     | undefined;
   if (!row) {
@@ -256,6 +268,7 @@ export function testContent(
       storeName: row.name,
       offerNumber: row.offer_number,
       articleNumber: row.article_number,
+      country: row.country,
     }),
   };
 }

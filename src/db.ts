@@ -7,6 +7,7 @@ import { type PriceTag, priceTag } from "./insights.ts";
 
 export type StoredOffer = IkeaOffer & {
   storeName: string;
+  country: string;
   firstSeen: number;
   lastSeen: number;
   active: boolean;
@@ -17,6 +18,7 @@ export type StoredOffer = IkeaOffer & {
 export type StoreRow = {
   storeId: string;
   name: string;
+  country: string;
   followed: boolean;
   /** Left out of trip calculations (too far / not wanted). */
   tripExcluded: boolean;
@@ -39,6 +41,7 @@ type OfferRow = {
   offer_number: string;
   store_id: string;
   store_name: string | null;
+  country: string | null;
   followed: number;
   title: string;
   description: string;
@@ -88,6 +91,7 @@ export function openDb(path: string): DatabaseSync {
       postcode TEXT NOT NULL,
       store_id TEXT NOT NULL,
       km REAL NOT NULL,
+      minutes REAL,
       source TEXT NOT NULL,
       PRIMARY KEY (postcode, store_id)
     );
@@ -95,6 +99,7 @@ export function openDb(path: string): DatabaseSync {
       from_store TEXT NOT NULL,
       to_store TEXT NOT NULL,
       km REAL NOT NULL,
+      minutes REAL,
       source TEXT NOT NULL,
       PRIMARY KEY (from_store, to_store)
     );
@@ -147,9 +152,26 @@ export function openDb(path: string): DatabaseSync {
   if (!alertCols.includes("delivery")) {
     db.exec("ALTER TABLE alerts ADD COLUMN delivery TEXT NOT NULL DEFAULT ''");
   }
+  for (const table of ["trip_cache", "store_dist"]) {
+    const cols = (
+      db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+    ).map((c) => c.name);
+    if (!cols.includes("minutes")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN minutes REAL`);
+    }
+  }
   const storeCols = (
     db.prepare("PRAGMA table_info(stores)").all() as { name: string }[]
   ).map((c) => c.name);
+  if (!storeCols.includes("country")) {
+    db.exec("ALTER TABLE stores ADD COLUMN country TEXT NOT NULL DEFAULT 'nl'");
+  }
+  if (!storeCols.includes("enabled")) {
+    db.exec("ALTER TABLE stores ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1");
+  }
+  if (!alertCols.includes("country")) {
+    db.exec("ALTER TABLE alerts ADD COLUMN country TEXT NOT NULL DEFAULT 'nl'");
+  }
   if (!storeCols.includes("trip_excluded")) {
     db.exec(
       "ALTER TABLE stores ADD COLUMN trip_excluded INTEGER NOT NULL DEFAULT 0",
@@ -166,25 +188,33 @@ export function openDb(path: string): DatabaseSync {
   return db;
 }
 
-export function upsertStores(db: DatabaseSync, stores: Store[]): void {
+export function upsertStores(
+  db: DatabaseSync,
+  stores: Store[],
+  country = "nl",
+): void {
   const stmt = db.prepare(
-    `INSERT INTO stores (store_id, name) VALUES (?, ?)
-     ON CONFLICT (store_id) DO UPDATE SET name = excluded.name`,
+    `INSERT INTO stores (store_id, name, country, enabled) VALUES (?, ?, ?, 1)
+     ON CONFLICT (store_id) DO UPDATE SET name = excluded.name, country = excluded.country, enabled = 1`,
   );
-  for (const s of stores) stmt.run(s.storeId, s.name);
+  for (const s of stores) stmt.run(s.storeId, s.name, country);
 }
 
-export function listStores(db: DatabaseSync): StoreRow[] {
+export function listStores(
+  db: DatabaseSync,
+  options: { includeDisabled?: boolean } = {},
+): StoreRow[] {
   const rows = db
     .prepare(
-      `SELECT s.store_id AS storeId, s.name, s.followed, s.trip_excluded AS tripExcluded, s.last_synced AS lastSynced,
+      `SELECT s.store_id AS storeId, s.name, s.country, s.followed, s.trip_excluded AS tripExcluded, s.last_synced AS lastSynced,
               s.last_error AS lastError,
               (SELECT COUNT(*) FROM offers o WHERE o.store_id = s.store_id AND o.active = 1) AS activeOffers
-       FROM stores s ORDER BY s.name`,
+       FROM stores s ${options.includeDisabled ? "" : "WHERE s.enabled = 1"} ORDER BY s.country, s.name`,
     )
     .all() as {
     storeId: string;
     name: string;
+    country: string;
     followed: number;
     tripExcluded: number;
     lastSynced: number | null;
@@ -312,6 +342,7 @@ const toOffer = (r: OfferRow): StoredOffer => ({
   offerNumber: r.offer_number,
   storeId: r.store_id,
   storeName: r.store_name ?? r.store_id,
+  country: r.country ?? "nl",
   title: r.title,
   description: r.description,
   price: r.price,
@@ -340,7 +371,7 @@ export function searchOffers(
   db: DatabaseSync,
   filter: OfferFilter,
 ): { total: number; items: StoredOffer[] } {
-  const where = ["o.active = 1"];
+  const where = ["o.active = 1", "s.enabled = 1"];
   const args: (string | number)[] = [];
   if (filter.storeId) {
     where.push("o.store_id = ?");
@@ -367,14 +398,16 @@ export function searchOffers(
   const whereSql = where.join(" AND ");
   const total = (
     db
-      .prepare(`SELECT COUNT(*) AS n FROM offers o WHERE ${whereSql}`)
+      .prepare(
+        `SELECT COUNT(*) AS n FROM offers o JOIN stores s ON s.store_id = o.store_id WHERE ${whereSql}`,
+      )
       .get(...args) as { n: number }
   ).n;
   const limit = Math.min(Math.max(filter.limit ?? 60, 1), 200);
   const offset = Math.max(filter.offset ?? 0, 0);
   const rows = db
     .prepare(
-      `SELECT o.*, s.name AS store_name, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
+      `SELECT o.*, s.name AS store_name, s.country AS country, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
        FROM offers o LEFT JOIN stores s ON s.store_id = o.store_id
        WHERE ${whereSql}
        ORDER BY ifnull(s.followed, 0) DESC, ${ORDER_BY[filter.sort ?? "new"]}
@@ -397,9 +430,9 @@ export function articleInsights(
 ): Record<string, ArticleInsight> {
   const result: Record<string, ArticleInsight> = {};
   const offersStmt = db.prepare(
-    `SELECT o.*, s.name AS store_name, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
+    `SELECT o.*, s.name AS store_name, s.country AS country, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
      FROM offers o LEFT JOIN stores s ON s.store_id = o.store_id
-     WHERE o.article_number = ? AND o.active = 1 ORDER BY o.price ASC`,
+     WHERE o.article_number = ? AND o.active = 1 AND s.enabled = 1 ORDER BY o.price ASC`,
   );
   const lowStmt = db.prepare(
     "SELECT MIN(price) AS low FROM price_history WHERE article_number = ?",

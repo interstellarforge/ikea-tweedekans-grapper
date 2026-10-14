@@ -34,9 +34,11 @@
         money,
         ago,
         initShell,
+        duration,
         insightChips,
         empty,
         chip,
+        countryTag,
       } = App;
       const refreshShell = initShell("watchlist");
 
@@ -45,9 +47,13 @@
         try {
           const data = await api("/api/trips");
           const r = data.configured ? data.bestRoute : undefined;
-          banner.hidden = !r?.worthIt;
-          if (!r?.worthIt) return;
-          const names = r.stops.map((st) => st.storeName);
+          const status = r?.status ?? "bad";
+          banner.hidden = !r || status === "bad";
+          if (!r || status === "bad") return;
+          banner.className = status === "good" ? "banner-good" : "banner-warn";
+          const names = r.stops.map(
+            (st) => st.storeName + countryTag(st.country),
+          );
           const route =
             names.length === 1
               ? `naar ${names[0]}`
@@ -60,10 +66,13 @@
           );
           banner.replaceChildren(
             el("strong", {
-              textContent: `Een ritje ${route} is rendabel: +${money(r.net)} netto`,
+              textContent:
+                status === "good"
+                  ? `Een ritje ${route} is rendabel: +${money(r.net)} netto`
+                  : `Een ritje ${route} is rendabel in geld (+${money(r.moneyNet)}), maar niet in tijd`,
             }),
             el("span", {
-              textContent: ` · ${r.totalKm} km totaal, ${units} stuks, besparing ${money(r.saving)} min ${money(r.tripCost)} brandstof`,
+              textContent: ` · ${r.totalKm} km, ${duration(r.totalMinutes)} totaal, ${units} stuks, besparing ${money(r.saving)} min ${money(r.tripCost)} brandstof${r.timeCost > 0 ? `, tijdkosten ${money(r.timeCost)}` : ""}`,
             }),
           );
         } catch {
@@ -82,7 +91,7 @@
               "div",
               { className: "alert" },
               el("strong", {
-                textContent: `${a.title} ligt in ${a.storeName} voor ${money(a.price)}!`,
+                textContent: `${a.title} ligt in ${a.storeName}${countryTag(a.country)} voor ${money(a.price)}!`,
               }),
               el("span", {
                 className: "meta",

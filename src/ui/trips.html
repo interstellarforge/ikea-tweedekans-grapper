@@ -6,6 +6,12 @@
     <title>Ritje-check · IKEA Tweedekans</title>
     <link rel="stylesheet" href="/assets/app.css" />
     <style>
+      .route.warn {
+        border-color: var(--warn);
+      }
+      .net.warn {
+        color: var(--warn);
+      }
       .route.good {
         border-color: var(--good);
       }
@@ -75,8 +81,39 @@
     </main>
     <script src="/assets/app.js"></script>
     <script>
-      const { $, el, api, money, chip, empty, initShell } = App;
+      const {
+        $,
+        el,
+        api,
+        money,
+        chip,
+        empty,
+        initShell,
+        duration,
+        countryTag,
+      } = App;
       initShell("trips");
+
+      const state = { hourlyRate: 0 };
+      const statusKind = (status) =>
+        status === "good" ? "good" : status === "time" ? "warn" : "bad";
+      const statusLabel = (status) =>
+        status === "good"
+          ? "Rit is de moeite waard"
+          : status === "time"
+            ? "Rendabel in geld, niet in tijd"
+            : "Niet de moeite waard";
+      const timeFacts = (x, hourlyRate) =>
+        hourlyRate > 0
+          ? [
+              el("span", {
+                textContent: `Tijdkosten: ${money(x.timeCost)} (${money(hourlyRate)}/uur)`,
+              }),
+              el("span", {
+                textContent: `Netto in geld: ${money(x.moneyNet)}`,
+              }),
+            ]
+          : [];
 
       const trip = (t) => {
         const lines = t.items.filter((i) => i.found > 0);
@@ -87,18 +124,16 @@
             "header",
             {},
             el("h2", {
-              textContent: `${t.followed ? "★ " : ""}${t.storeName}`,
+              textContent: `${t.followed ? "★ " : ""}${t.storeName}${countryTag(t.country)}`,
             }),
             chip(
-              t.worthIt
-                ? "Rit is de moeite waard"
-                : lines.length
-                  ? "Niet de moeite waard"
-                  : "Niets van je lijst aanwezig",
-              t.worthIt ? "good" : lines.length ? "bad" : "",
+              lines.length
+                ? statusLabel(t.status)
+                : "Niets van je lijst aanwezig",
+              lines.length ? statusKind(t.status) : "",
             ),
             el("span", {
-              className: `net ${t.worthIt ? "good" : "bad"}`,
+              className: `net ${statusKind(t.status)}`,
               textContent: lines.length
                 ? `${t.net >= 0 ? "+" : "−"}${money(Math.abs(t.net))}`
                 : "–",
@@ -111,9 +146,13 @@
               textContent: `${t.oneWayKm} km enkele reis${t.distanceSource === "estimate" ? " (schatting)" : ""}`,
             }),
             el("span", {
+              textContent: `Tijd: ${duration(t.driveMinutes)} rijden + ${duration(t.stopMinutes)} in de winkel = ${duration(t.totalMinutes)}`,
+            }),
+            el("span", {
               textContent: `Ritkosten: ${money(t.tripCost)} (${t.roundTripKm} km)`,
             }),
             el("span", { textContent: `Besparing: ${money(t.saving)}` }),
+            ...timeFacts(t, state.hourlyRate),
             el("span", { textContent: `Te betalen: ${money(t.spend)}` }),
           ),
           lines.length
@@ -146,7 +185,7 @@
 
       const routePanel = (r, data) => {
         if (!r || r.stops.length < 2) return null;
-        const names = r.stops.map((s) => s.storeName);
+        const names = r.stops.map((s) => s.storeName + countryTag(s.country));
         const title =
           names.length === 2
             ? `Rij naar ${names[0]} via ${names[1]}`
@@ -154,17 +193,14 @@
         const gain = r.gainOverSingle;
         return el(
           "section",
-          { className: `panel trip route ${r.worthIt ? "good" : ""}` },
+          { className: `panel trip route ${statusKind(r.status)}` },
           el(
             "header",
             {},
             el("h2", { textContent: `Slimste route: ${title}` }),
-            chip(
-              r.worthIt ? "Rit is de moeite waard" : "Niet de moeite waard",
-              r.worthIt ? "good" : "bad",
-            ),
+            chip(statusLabel(r.status), statusKind(r.status)),
             el("span", {
-              className: `net ${r.worthIt ? "good" : "bad"}`,
+              className: `net ${statusKind(r.status)}`,
               textContent: `${r.net >= 0 ? "+" : "−"}${money(Math.abs(r.net))}`,
             }),
           ),
@@ -174,8 +210,18 @@
             el("span", {
               textContent: `${r.totalKm} km totaal (thuis → ${names.join(" → ")} → thuis)`,
             }),
+            el("span", {
+              textContent: `Tijd: ${duration(r.driveMinutes)} rijden + ${duration(r.stopMinutes)} in de winkels = ${duration(r.totalMinutes)}`,
+            }),
+            r.approximateOrder
+              ? el("span", {
+                  className: "err",
+                  textContent: "Volgorde is een benadering (meer dan 4 stops)",
+                })
+              : null,
             el("span", { textContent: `Ritkosten: ${money(r.tripCost)}` }),
             el("span", { textContent: `Besparing: ${money(r.saving)}` }),
+            ...timeFacts(r, state.hourlyRate),
             el("span", { textContent: `Te betalen: ${money(r.spend)}` }),
             r.bestSingleName
               ? el("span", {
@@ -195,7 +241,7 @@
                 {},
                 el("strong", {
                   className: "name",
-                  textContent: `${s.followed ? "★ " : ""}${s.storeName} (${s.legKm} km)`,
+                  textContent: `${s.followed ? "★ " : ""}${s.storeName}${countryTag(s.country)} (${s.legKm} km, ${duration(s.legMinutes)})`,
                 }),
                 el(
                   "span",
@@ -239,10 +285,39 @@
         }
         $("summary").textContent =
           `Vanaf ${data.postcode} · benzine ${money(data.fuelPrice)}/l · ${data.consumptionPer100km} l/100 km · ${data.wantedUnits} stuks nodig`;
+        state.hourlyRate = data.hourlyRate;
         $("route").replaceChildren(
           ...[routePanel(data.bestRoute, data)].filter(Boolean),
         );
-        $("trips").replaceChildren(...data.stores.map(trip));
+        const relevant = data.stores.filter((t) =>
+          t.items.some((i) => i.found > 0),
+        );
+        const empties = data.stores.filter(
+          (t) => !t.items.some((i) => i.found > 0),
+        );
+        $("trips").replaceChildren(
+          ...relevant.map(trip),
+          ...(empties.length
+            ? [
+                el(
+                  "details",
+                  { className: "panel" },
+                  el("summary", {
+                    textContent: `${empties.length} filialen hebben niets van je lijst`,
+                  }),
+                  el(
+                    "div",
+                    { className: "facts" },
+                    ...empties.map((t) =>
+                      el("span", {
+                        textContent: `${t.storeName}${countryTag(t.country)} (${t.oneWayKm} km)`,
+                      }),
+                    ),
+                  ),
+                ),
+              ]
+            : []),
+        );
       })();
     </script>
   </body>
