@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Zoeken in producten · IKEA Tweedekans</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .starter h2 {
+        font-size: 18px;
+        margin: 8px 0 4px;
+      }
+      .starter-group {
+        padding: 14px 0;
+        border-top: 1px solid var(--line);
+      }
+      .starter-group h3 {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0 0 8px;
+        font-weight: 600;
+      }
+    </style>
   </head>
   <body>
     <main>
@@ -22,6 +38,14 @@
         />
       </div>
       <div id="status" class="hint"></div>
+      <section id="starter" class="starter">
+        <h2>Veelgezocht</h2>
+        <p class="lead">
+          Kies een serie of zoek op naam of artikelnummer. Series die vaak in de
+          tweedekanshoek liggen staan hieronder.
+        </p>
+        <div id="groups"></div>
+      </section>
       <div class="grid" id="results"></div>
     </main>
     <script src="/assets/app.js"></script>
@@ -39,8 +63,44 @@
       } = App;
       initShell("catalog");
 
+      const STARTERS = [
+        ["Keuken", ["METOD", "SEKTION", "KNOXHULT", "ENHET"]],
+        ["Kasten en opbergen", ["PAX", "BILLY", "KALLAX", "BESTÅ", "IVAR"]],
+        ["Slaapkamer", ["MALM", "HEMNES", "BRIMNES", "SONGESAND"]],
+        ["Wonen en werken", ["LACK", "POÄNG", "ALEX", "MICKE", "LINNMON"]],
+        ["Onderdelen", ["KOMPLEMENT", "UTRUSTA", "MAXIMERA", "RATIONELL"]],
+      ];
+      const renderStarter = () => {
+        $("groups").replaceChildren(
+          ...STARTERS.map(([title, names]) =>
+            el(
+              "div",
+              { className: "starter-group" },
+              el("h3", { textContent: title }),
+              el(
+                "div",
+                { className: "chips" },
+                ...names.map((n) => {
+                  const b = el("button", {
+                    className: "pill",
+                    textContent: n,
+                  });
+                  b.onclick = () => {
+                    $("q").value = n;
+                    search();
+                  };
+                  return b;
+                }),
+              ),
+            ),
+          ),
+        );
+      };
+      renderStarter();
+
       async function search() {
         const q = $("q").value.trim();
+        $("starter").hidden = q.length >= 2;
         if (q.length < 2) {
           $("status").textContent = "";
           $("results").replaceChildren();

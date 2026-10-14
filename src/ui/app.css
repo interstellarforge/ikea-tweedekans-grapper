@@ -1330,3 +1330,28 @@ dialog.modal textarea {
 .grid > .empty {
   grid-column: 1 / -1;
 }
+
+.site-foot {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 16px 28px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+main > h1 {
+  margin: 0 0 8px;
+}
+main > h1 + .banner-good,
+main > h1 + .banner-warn {
+  margin-top: 14px;
+}
+.menu-item svg,
+.ico {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

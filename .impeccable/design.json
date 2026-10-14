@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T00:00:00Z",
+  "title": "Design System: IKEA Tweedekans",
+  "extensions": {
+    "colorMeta": {
+      "blue": { "role": "primary", "displayName": "IKEA Blue", "canonical": "#0058a3", "tonalRamp": ["#00203d", "#003e75", "#0058a3", "#2f7cc0", "#5c9ad0", "#8ebbe1", "#c0d8ee", "#e3effa"] },
+      "blue-strong": { "role": "primary", "displayName": "Deep Blue", "canonical": "#003e75", "tonalRamp": ["#001a33", "#002a50", "#003e75", "#0058a3", "#3a7fbd", "#7aa9d3", "#b5cfe6", "#e3effa"] },
+      "yellow": { "role": "secondary", "displayName": "IKEA Yellow", "canonical": "#ffdb00", "tonalRamp": ["#4d4200", "#807000", "#b39a00", "#f2c800", "#ffdb00", "#ffe74d", "#fff08a", "#fff8c2"] },
+      "fg": { "role": "neutral", "displayName": "Ink", "canonical": "#111a24", "tonalRamp": ["#111a24", "#2b3541", "#566170", "#7d8896", "#a5aeba", "#bcc5d1", "#d9dfe7", "#f3f5f8"] },
+      "bg": { "role": "neutral", "displayName": "Mist", "canonical": "#f3f5f8", "tonalRamp": ["#111a24", "#566170", "#8c97a5", "#bcc5d1", "#d9dfe7", "#e8ecf1", "#eef1f5", "#f3f5f8"] },
+      "good": { "role": "status", "displayName": "Receipt Green", "canonical": "#17703f", "tonalRamp": ["#0b3a20", "#115430", "#17703f", "#3b9262", "#6fb48d", "#a3d1b7", "#dcf3e5", "#eef9f2"] },
+      "bad": { "role": "status", "displayName": "Alert Red", "canonical": "#b3261e", "tonalRamp": ["#5c120f", "#861c16", "#b3261e", "#d0564f", "#e38882", "#f0b3af", "#fde6e3", "#fef3f1"] },
+      "warn": { "role": "status", "displayName": "Amber Warning", "canonical": "#8f4a00", "tonalRamp": ["#3d2000", "#663500", "#8f4a00", "#b86b14", "#d4954a", "#e8bb85", "#ffecc9", "#fff6e3"] }
+    },
+    "typographyMeta": {
+      "h1": { "displayName": "Page Title", "purpose": "One per page, 800 weight; 23px on phones." },
+      "h2": { "displayName": "Section Title", "purpose": "Panels and dialog heads." },
+      "h3": { "displayName": "Item Title", "purpose": "Cards and group heads." },
+      "body": { "displayName": "Body", "purpose": "Default 15px reading text." },
+      "label": { "displayName": "Control Label", "purpose": "Buttons and pills." },
+      "caption": { "displayName": "Caption", "purpose": "Hints, meta, chips." },
+      "price": { "displayName": "Price", "purpose": "Every money figure, tabular numerals." },
+      "landing-display": { "displayName": "Landing Display", "purpose": "Hero statement only, second line yellow." },
+      "price-tag-numeral": { "displayName": "Price-Tag Numeral", "purpose": "Landing tag object, cents raised at 24px." }
+    },
+    "shadows": [
+      { "name": "shadow-1", "value": "0 1px 2px rgba(17,26,36,0.08), 0 2px 8px rgba(17,26,36,0.06)", "purpose": "Cards and landing fragments at rest." },
+      { "name": "shadow-2", "value": "0 4px 12px rgba(17,26,36,0.12), 0 16px 40px rgba(17,26,36,0.14)", "purpose": "Menus, dialogs, card hover." },
+      { "name": "hero-object", "value": "0 2px 4px rgba(0,0,0,0.18), 0 22px 44px rgba(0,0,0,0.3)", "purpose": "Landing price tag only." }
+    ],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "All state transitions: 0.15s colour, 0.1s press." },
+      { "name": "settle-arrive", "value": "0.9s settle, 0.7s arrive after 0.55s", "purpose": "Landing tag and notification entrance; disabled under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "720px" },
+      { "name": "auth-split", "value": "900px" },
+      { "name": "landing-narrow", "value": "560px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default action; blue fill, deepens on hover.",
+      "html": "<button class=\"ds-btn\">Opslaan</button>",
+      "css": ".ds-btn{font:600 14px/1.2 var(--font,'Noto Sans',system-ui,sans-serif);padding:10px 16px;border-radius:8px;border:1px solid #0058a3;background:#0058a3;color:#fff;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}.ds-btn:hover{background:#003e75;border-color:#003e75}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:3px solid #ffdb00;outline-offset:2px}"
+    },
+    {
+      "name": "Yellow Action Button",
+      "kind": "button",
+      "refersTo": "button-yellow",
+      "description": "The single most important action on a surface.",
+      "html": "<button class=\"ds-btn-yellow\">Gratis account maken</button>",
+      "css": ".ds-btn-yellow{font:600 14px/1.2 'Noto Sans',system-ui,sans-serif;padding:10px 16px;border-radius:8px;border:1px solid #ffdb00;background:#ffdb00;color:#111a24;cursor:pointer;transition:background .15s}.ds-btn-yellow:hover{background:#f2c800;border-color:#f2c800}.ds-btn-yellow:focus-visible{outline:3px solid #ffdb00;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet alternative with a strong rule border.",
+      "html": "<button class=\"ds-btn-sec\">Annuleren</button>",
+      "css": ".ds-btn-sec{font:600 14px/1.2 'Noto Sans',system-ui,sans-serif;padding:10px 16px;border-radius:8px;border:1px solid #bcc5d1;background:transparent;color:#004f93;cursor:pointer}.ds-btn-sec:hover{background:#e8ecf1}.ds-btn-sec:focus-visible{outline:3px solid #ffdb00;outline-offset:2px}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "42px field with brand border and yellow halo on focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Zoek een product\">",
+      "css": ".ds-input{font:inherit;color:#111a24;background:#fff;border:1px solid #bcc5d1;border-radius:8px;padding:10px 12px;min-height:42px}.ds-input::placeholder{color:#566170}.ds-input:focus{outline:3px solid rgba(255,219,0,.7);border-color:#0058a3}"
+    },
+    {
+      "name": "Shell Navigation",
+      "kind": "nav",
+      "refersTo": "shell-header",
+      "description": "Blue sticky header; active link gets a yellow underline.",
+      "html": "<header class=\"ds-shell\"><a class=\"ds-link\">Lijsten</a><a class=\"ds-link ds-active\">Tweedekans</a><a class=\"ds-link\">Meldingen</a></header>",
+      "css": ".ds-shell{background:#0058a3;display:flex;gap:2px;padding:0 16px;min-height:60px;align-items:center;font-family:'Noto Sans',system-ui,sans-serif}.ds-link{color:#fff;padding:8px 12px;border-radius:8px;font-weight:500;opacity:.88;text-decoration:none}.ds-link:hover{background:rgba(255,255,255,.12);opacity:1}.ds-active{background:rgba(255,255,255,.18);font-weight:700;opacity:1;box-shadow:inset 0 -3px 0 #ffdb00}"
+    },
+    {
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill labels for condition and status, tinted with text.",
+      "html": "<span class=\"ds-chip\">Gevolgd</span> <span class=\"ds-chip ds-good\">Goedkoper</span> <span class=\"ds-chip ds-new\">Nieuw</span>",
+      "css": ".ds-chip{display:inline-flex;font:700 12px/1.4 'Noto Sans',system-ui,sans-serif;padding:3px 9px;border-radius:999px;background:#e8ecf1;color:#111a24}.ds-good{background:#dcf3e5;color:#17703f}.ds-new{background:#ffdb00;color:#111a24}"
+    },
+    {
+      "name": "Offer Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Product offer: contained image, title, heavy tabular price.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-img\"></div><div class=\"ds-body\"><strong>METOD wandkast</strong><div><span class=\"ds-price\">&euro;45</span><span class=\"ds-old\">&euro;79</span></div></div></div>",
+      "css": ".ds-card{width:220px;background:#fff;border:1px solid #d9dfe7;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(17,26,36,.08),0 2px 8px rgba(17,26,36,.06);font-family:'Noto Sans',system-ui,sans-serif;color:#111a24}.ds-img{aspect-ratio:1;background:#fff;border-bottom:1px solid #d9dfe7}.ds-body{padding:12px 14px 14px;display:grid;gap:8px}.ds-price{font-weight:800;font-size:20px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}.ds-old{text-decoration:line-through;color:#566170;margin-left:8px;font-size:13px;font-weight:500}"
+    },
+    {
+      "name": "Price Tag",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Landing signature: yellow strip, blue punch hole, raised-cents numerals.",
+      "html": "<div class=\"ds-tag\"><span class=\"ds-punch\"></span><div class=\"ds-eur\">45<sup>95</sup></div><div class=\"ds-where\">IKEA Amersfoort</div></div>",
+      "css": ".ds-tag{position:relative;background:#fff;color:#111a24;border-radius:14px;padding:22px 26px 18px 64px;box-shadow:0 2px 4px rgba(0,0,0,.18),0 22px 44px rgba(0,0,0,.3);transform:rotate(-1.6deg);font-family:'Noto Sans',system-ui,sans-serif;overflow:hidden}.ds-tag::before{content:'';position:absolute;left:0;top:0;bottom:0;width:44px;background:#ffdb00}.ds-punch{position:absolute;left:12px;top:24px;width:20px;height:20px;border-radius:50%;background:#0058a3}.ds-eur{font-weight:800;font-size:56px;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.ds-eur sup{font-size:24px;vertical-align:top;position:relative;top:6px;margin-left:2px;letter-spacing:0}.ds-where{margin-top:12px;padding-top:10px;border-top:1px solid #d9dfe7;font-size:14px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shop-Floor Companion",
+    "overview": "The app speaks IKEA's own visual language: a blue field, a yellow action, price-tag numerals and assembly-sheet logic. It is a tool used one-handed in a car park or a store, so it is dense, flat and legible rather than decorative. Everything that is not a number or an action recedes into cool off-white (dark mode: ink-blue).\n\nDepth comes from 1px rules and tonal surfaces; shadows are soft, real-offset and used sparingly. Radii are small (8px controls, 14px containers). One icon stroke (1.75px) and one typeface (Noto Sans, self-hosted) carry the whole system. The landing rejects the SaaS template (centred headline, three icon cards, logo wall) and proves its mechanism with real UI fragments labelled \"Voorbeeld\".",
+    "keyCharacteristics": [
+      "Blue owns identity (header, hero, aside, primary buttons); yellow owns the single action and the focus ring.",
+      "Prices are the loudest type: heavy numerals, tabular figures, raised cents on the landing tag.",
+      "Flat 1px rules (line, line-strong) separate content; 2px ink rules mark assembly-sheet steps and totals.",
+      "Light and dark both first-class via prefers-color-scheme.",
+      "Status always carries text, never colour alone."
+    ],
+    "rules": [
+      { "name": "The One Action Rule", "body": "Yellow marks the single most important action or signal on a surface; blue is identity and default buttons.", "section": "colors" },
+      { "name": "The Text-On-Yellow Rule", "body": "Text on yellow is always fg ink, never white.", "section": "colors" },
+      { "name": "The Status Pair Rule", "body": "Status colour text sits on its -bg tint and is accompanied by words or an icon.", "section": "colors" },
+      { "name": "The Tabular Rule", "body": "Prices, quantities, durations and table cells use tabular numerals.", "section": "typography" },
+      { "name": "The Weight-Not-Face Rule", "body": "Hierarchy comes from weight and size inside Noto Sans; no second display face.", "section": "typography" },
+      { "name": "The Real Offset Rule", "body": "Shadows have blur and a real offset and soften; no hard zero-blur offsets.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use var(--*) tokens; the dark theme works only through them.",
+      "Do reserve yellow for the one action, focus and small signals; put ink text on it.",
+      "Do show money in euros with tabular numerals, prefix estimates with \"~\".",
+      "Do use the shared inline SVG icon set at stroke 1.75px for every icon.",
+      "Do use custom dialog.modal instead of native popups.",
+      "Do label demonstration fragments \"Voorbeeld\" and keep the unofficial, not-affiliated-with-IKEA note near actions."
+    ],
+    "donts": [
+      "Don't use emoji or glyph characters as icons.",
+      "Don't use a second typeface or system display face for headings.",
+      "Don't signal status by colour alone.",
+      "Don't add gradient fills, glassmorphism or hard offset shadows.",
+      "Don't build the landing from centred hero, three icon cards and a logo wall.",
+      "Don't claim partnership, testimonials, counts or press that do not exist."
+    ]
+  }
+}

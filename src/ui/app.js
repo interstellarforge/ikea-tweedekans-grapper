@@ -231,6 +231,7 @@ const App = (() => {
     const svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("class", "ico");
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", SVG[name] ?? "");
     svg.append(path);
