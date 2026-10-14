@@ -239,12 +239,17 @@
                       textContent: "Productpagina op IKEA.nl",
                     })
                   : null,
-                el("a", {
-                  href: "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/",
-                  target: "_blank",
-                  rel: "noopener",
-                  textContent: "Tweedekanshoek op IKEA.nl",
-                }),
+                cheapest
+                  ? el("a", {
+                      href: ikeaOfferUrl(
+                        cheapest.storeName,
+                        cheapest.offerNumber,
+                      ),
+                      target: "_blank",
+                      rel: "noopener",
+                      textContent: `Goedkoopste aanbieding bij IKEA (${cheapest.storeName}) ↗`,
+                    })
+                  : null,
               ),
             ),
           ),
