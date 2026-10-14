@@ -72,6 +72,13 @@ import {
   type UserSettingsInput,
 } from "./settings.ts";
 import { parseShoppingList } from "./shopping-list.ts";
+import {
+  bump,
+  computeStats,
+  getPublicStatsConfig,
+  publicStats,
+  savePublicStatsConfig,
+} from "./stats.ts";
 import { computeTrips } from "./trips.ts";
 import {
   checkLogin,
@@ -301,6 +308,11 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
       return;
     }
 
+    if (method === "GET" && path === "/api/public-stats") {
+      send(res, 200, publicStats(db));
+      return;
+    }
+
     if (method === "GET" && path === "/api/auth/config") {
       const first = countUsers(db) === 0;
       send(res, 200, {
@@ -321,6 +333,7 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
       const ok = checkLogin(db, str(body["email"]), str(body["password"]));
       if (ok) {
         limiter.clear(clientIp);
+        bump(db, "logins");
         touchLogin(db, ok.id, Date.now());
         startSession(ok);
         send(res, 200, { ok: true });
@@ -588,6 +601,30 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
         return;
       }
 
+      if (method === "GET" && path === "/api/admin/stats") {
+        send(res, 200, {
+          stats: computeStats(db),
+          public: getPublicStatsConfig(db),
+        });
+        return;
+      }
+
+      if (method === "PUT" && path === "/api/admin/stats-public") {
+        const body = await readJson(req);
+        const keys = Array.isArray(body["keys"])
+          ? body["keys"].filter((k): k is string => typeof k === "string")
+          : [];
+        send(
+          res,
+          200,
+          savePublicStatsConfig(db, {
+            enabled: body["enabled"] === true,
+            keys,
+          }),
+        );
+        return;
+      }
+
       if (method === "GET" && path === "/api/admin/status") {
         send(res, 200, { ...pollStatus, stores: listStores(db) });
         return;
@@ -682,7 +719,7 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
     if (method === "POST" && testMatch?.[1]) {
       const channel = CHANNEL_PARAM[testMatch[1]];
       try {
-        const msg = testContent(db, ctx, "Testmelding van IKEA Tweedekans.");
+        const msg = testContent(db, ctx, "Testmelding van Tweedekanshoek.");
         await deliver(db, user, msg, channel);
         send(res, 200, { ok: true });
       } catch (error) {
@@ -752,6 +789,7 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
         send(res, 200, []);
         return;
       }
+      bump(db, "search_catalog");
       const products = await searchCatalog(q);
       const insights = articleInsights(
         db,
@@ -1086,6 +1124,7 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
 
     // ------------------------------------------------------------ trips
     if (method === "GET" && path === "/api/trips") {
+      bump(db, "trip_checks");
       send(res, 200, await computeTrips(db, user.id));
       return;
     }
@@ -1147,6 +1186,9 @@ export function createApp(db: DatabaseSync, secret: Buffer): Server {
     }
 
     if (method === "GET" && path === "/api/offers") {
+      if ((url.searchParams.get("q") ?? "").trim() !== "") {
+        bump(db, "search_offers");
+      }
       const hours = num(url.searchParams.get("newHours"));
       const sort = url.searchParams.get("sort");
       const scopeParam = url.searchParams.get("followed");

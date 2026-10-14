@@ -39,7 +39,7 @@ An independent companion for IKEA's second-chance stock: it does not just list o
 
 ## Brand Commitments
 
-Name stays "IKEA Tweedekans" (confirmed by the user), always with a clear note that the app is unofficial and not affiliated with IKEA. No claims of partnership or official data.
+Name is "Tweedekanshoek" (domain tweedekanshoek.nl; renamed from "IKEA Tweedekans"), always with a clear note that the app is unofficial and not affiliated with IKEA. No claims of partnership or official data.
 
 ## Evidence on Hand
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Beheer · IKEA Tweedekans</title>
+    <title>Beheer · Tweedekanshoek</title>
     <link rel="stylesheet" href="/assets/app.css" />
     <style>
       .role {
@@ -20,6 +20,40 @@
       .role.off {
         background: var(--bad-bg);
         color: var(--bad);
+      }
+      .stat-group h2 {
+        font-size: 16px;
+        margin: 22px 0 10px;
+      }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 10px;
+      }
+      .stat {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 12px 14px;
+        display: grid;
+        gap: 2px;
+      }
+      .stat strong {
+        font-size: 26px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat > span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .stat-pub {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        gap: 6px;
+        align-items: center;
       }
       td .actions {
         display: flex;
@@ -54,12 +88,38 @@
     <main>
       <h1>Beheer</h1>
       <nav class="tabs" id="tabs">
+        <a href="#statistieken" data-for="statistieken">Statistieken</a>
         <a href="#gebruikers" data-for="gebruikers">Gebruikers</a>
         <a href="#meldingen" data-for="meldingen">Meldingstypes</a>
         <a href="#ophalen" data-for="ophalen">Ophalen &amp; status</a>
       </nav>
 
-      <div data-tab="gebruikers">
+      <div data-tab="statistieken" hidden>
+        <details class="channel" open>
+          <summary>Op de landingspagina</summary>
+          <div class="body">
+            <p class="hint">
+              Kies hieronder welke cijfers bezoekers op de startpagina zien.
+              Alleen cijfers groter dan 0 worden getoond; zonder keuze of met de
+              schakelaar uit verschijnt de sectie niet.
+            </p>
+            <div class="field">
+              <label for="pubOn">Tonen</label>
+              <span>
+                <input type="checkbox" id="pubOn" />
+                <label for="pubOn">Toon de geselecteerde cijfers</label>
+              </span>
+            </div>
+            <div class="row">
+              <button id="pubSave">Opslaan</button>
+              <span class="hint" id="pubMsg"></span>
+            </div>
+          </div>
+        </details>
+        <div id="statGroups"></div>
+      </div>
+
+      <div data-tab="gebruikers" hidden>
         <details class="channel" open>
           <summary>Registratie</summary>
           <div class="body">
@@ -240,6 +300,7 @@
         el,
         api,
         send,
+        money,
         ago,
         initShell,
         promptDialog,
@@ -525,12 +586,77 @@
         loadStatus();
       };
 
+      // ---- statistics ----
+      let publicKeys = new Set();
+      const statValue = (st) =>
+        st.format === "eur"
+          ? money(st.value)
+          : new Intl.NumberFormat("nl-NL").format(st.value);
+      async function loadStats() {
+        const data = await api("/api/admin/stats");
+        publicKeys = new Set(data.public.keys);
+        $("pubOn").checked = data.public.enabled;
+        const groups = new Map();
+        for (const st of data.stats) {
+          if (!groups.has(st.group)) groups.set(st.group, []);
+          groups.get(st.group).push(st);
+        }
+        $("statGroups").replaceChildren(
+          ...[...groups].map(([name, list]) =>
+            el(
+              "section",
+              { className: "stat-group" },
+              el("h2", { textContent: name }),
+              el(
+                "div",
+                { className: "stat-grid" },
+                ...list.map((st) => {
+                  const box = el("input", {
+                    type: "checkbox",
+                    id: `pub-${st.key}`,
+                    checked: publicKeys.has(st.key),
+                    onchange: () => {
+                      if (box.checked) publicKeys.add(st.key);
+                      else publicKeys.delete(st.key);
+                    },
+                  });
+                  return el(
+                    "div",
+                    { className: "stat" },
+                    el("strong", { textContent: statValue(st) }),
+                    el("span", { textContent: st.label }),
+                    el(
+                      "label",
+                      { className: "stat-pub", htmlFor: box.id },
+                      box,
+                      " Op landing",
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        );
+      }
+      $("pubSave").onclick = async () => {
+        $("pubMsg").textContent = "Opslaan…";
+        try {
+          await send("/api/admin/stats-public", "PUT", {
+            enabled: $("pubOn").checked,
+            keys: [...publicKeys],
+          });
+          $("pubMsg").textContent = "Opgeslagen";
+        } catch (e) {
+          $("pubMsg").textContent = e.message;
+        }
+      };
+
       // ---- tabs ----
-      const TABS = ["gebruikers", "meldingen", "ophalen"];
+      const TABS = ["statistieken", "gebruikers", "meldingen", "ophalen"];
       const showTab = () => {
         const name = TABS.includes(location.hash.slice(1))
           ? location.hash.slice(1)
-          : "gebruikers";
+          : "statistieken";
         document.querySelectorAll("[data-tab]").forEach((d) => {
           d.hidden = d.dataset.tab !== name;
         });
@@ -545,6 +671,7 @@
         me = await api("/api/profile");
         applySettings(await api("/api/admin/settings"));
         loadUsers();
+        loadStats();
         loadStatus();
         setInterval(loadStatus, 10000);
       })();

@@ -12,6 +12,7 @@ import {
   type HomeAssistantSettings,
   type SmtpSettings,
 } from "./settings.ts";
+import { bump } from "./stats.ts";
 import type { User } from "./users.ts";
 import type { Alert } from "./watchlist.ts";
 
@@ -332,6 +333,13 @@ ${msg.links.click}
     return "geen kanaal actief";
   }
   const results = await Promise.allSettled(jobs.map(([, job]) => job));
+  if (!only) {
+    bump(
+      db,
+      "notifications_sent",
+      results.filter((r) => r.status === "fulfilled").length,
+    );
+  }
   const failed = results.flatMap((r, i) =>
     r.status === "rejected"
       ? [

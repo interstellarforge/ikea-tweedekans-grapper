@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Product · IKEA Tweedekans</title>
+    <title>Product · Tweedekanshoek</title>
     <link rel="stylesheet" href="/assets/app.css" />
     <style>
       .hero {
@@ -154,7 +154,7 @@
           );
           return;
         }
-        document.title = `${p.name} ${p.typeName} · IKEA Tweedekans`;
+        document.title = `${p.name} ${p.typeName} · Tweedekanshoek`;
         const offers = p.insight?.offers ?? [];
         const groups = groupOffers(offers);
         const followed = groups.filter((g) => g.followed);

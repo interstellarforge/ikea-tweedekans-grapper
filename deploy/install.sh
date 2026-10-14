@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command installer / updater for the IKEA Tweedekans systemd service.
+# One-command installer / updater for the Tweedekanshoek systemd service.
 #   sudo ./deploy/install.sh              install or update
 #   sudo ./deploy/install.sh --uninstall  remove service (keeps data and config)
 set -euo pipefail
@@ -143,7 +143,7 @@ fi
 echo "==> systemd-service installeren"
 cat > "$UNIT_FILE" <<UNIT
 [Unit]
-Description=IKEA Tweedekans watcher
+Description=Tweedekanshoek watcher
 After=network-online.target
 Wants=network-online.target
 

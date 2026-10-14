@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { IkeaOffer, Store } from "./ikea-client.ts";
 import { type PriceTag, priceTag } from "./insights.ts";
+import { ensureStatsSchema } from "./stats.ts";
 
 export type StoredOffer = IkeaOffer & {
   storeName: string;
@@ -232,6 +233,7 @@ export function openDb(path: string): DatabaseSync {
   }
   migrateWatchItemsToList(db);
   migrateToMultiUser(db);
+  ensureStatsSchema(db);
   return db;
 }
 

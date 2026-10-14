@@ -1,6 +1,6 @@
-# ikea-tweedekans-grapper
+# Tweedekanshoek (tweedekanshoek.nl)
 
-LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, search them, see what's new.
+LAN webpage + service: follow Tweedekanshoek offers in chosen stores, search them, see what's new.
 
 - Data: IKEA's public as-is API (`web-api.ikea.com/circular/circular-asis`), polled for all stores of the enabled countries (NL on by default; BE and DE optional in `/settings`).
 - Stack: Node >=22.18 (native TS + `node:sqlite`), no runtime deps. DB: `data/tweedekans.db`.
@@ -10,7 +10,7 @@ LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, searc
     pnpm install
     pnpm start        # http://<host>:8080
 
-Env: `PORT` (8080), `HOST`, `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
+Env: `PORT` (8080), `HOST`, `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen, bijv. `https://tweedekanshoek.nl`), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
 
 ## Linux service (systemd)
 
@@ -25,7 +25,7 @@ Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.
 
 Publiek: `/` (landingspagina; ingelogd → `/watchlist`), `/login`, `/register`, `/healthz`. Ontwerp: IKEA-blauw/geel, Noto Sans (zelf gehost, OFL, `src/ui/fonts`), één stylesheet `src/ui/app.css`. Plain HTML/CSS/JS, geen framework.
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/admin` (beheer), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
+`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (menu: Aanbod; zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/admin` (beheer: statistieken [ook selecteerbaar voor de landingspagina], gebruikers, meldingstypes, ophalen & status), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
 
 Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
 Gevolgde filialen bepalen alleen waarvoor meldingen komen.

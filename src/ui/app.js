@@ -487,7 +487,7 @@ const App = (() => {
   const NAV = [
     ["watchlist", "/watchlist", "Lijsten"],
     ["catalog", "/catalog", "Producten"],
-    ["tweedekans", "/tweedekans", "Tweedekanshoek"],
+    ["tweedekans", "/tweedekans", "Aanbod"],
     ["trips", "/trips", "Ritje-check"],
   ];
 
@@ -607,9 +607,9 @@ const App = (() => {
     const brand = el("a", {
       className: "brand",
       href: "/",
-      title: "IKEA Tweedekans",
+      title: "Tweedekanshoek",
     });
-    brand.append(brandMark(), el("span", {}, "IKEA Tweedekans"));
+    brand.append(brandMark(), el("span", {}, "Tweedekanshoek"));
     const burger = el("button", {
       className: "burger",
       ariaLabel: "Menu openen",

@@ -1,5 +1,5 @@
 ---
-name: IKEA Tweedekans
+name: Tweedekanshoek
 description: Unofficial shop-floor companion for IKEA second-chance stock, in IKEA's blue, yellow and price-tag numerals.
 colors:
   blue: "#0058a3"
@@ -160,7 +160,7 @@ components:
     rounded: "{rounded.pill}"
 ---
 
-# Design System: IKEA Tweedekans
+# Design System: Tweedekanshoek
 
 ## Overview
 
