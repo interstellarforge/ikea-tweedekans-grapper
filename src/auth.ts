@@ -1,4 +1,10 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  scryptSync,
+  timingSafeEqual,
+} from "node:crypto";
 
 export const SESSION_COOKIE = "session";
 export const SESSION_TTL_MS = 30 * 86_400_000;
@@ -6,8 +12,25 @@ export const SESSION_TTL_MS = 30 * 86_400_000;
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW_MS = 15 * 60_000;
 
+/** scrypt hash in the form "scrypt:<salt>:<hash>" (base64). */
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 32);
+  return `scrypt:${salt.toString("base64")}:${hash.toString("base64")}`;
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  const [scheme, saltB64, hashB64] = stored.split(":");
+  if (scheme !== "scrypt" || !saltB64 || !hashB64) return false;
+  const expected = Buffer.from(hashB64, "base64");
+  const actual = scryptSync(password, Buffer.from(saltB64, "base64"), 32);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
 export type Auth = {
   enabled: boolean;
+  /** Login name (empty when auth is disabled). */
+  user: string;
   checkCredentials: (user: string, password: string) => boolean;
   issueToken: (now?: number) => string;
   verifyToken: (token: string | undefined, now?: number) => boolean;
@@ -35,12 +58,21 @@ export function parseCookie(
 /** Single-user password auth with HMAC-signed, expiring session tokens. */
 export function createAuth(options: {
   user: string;
+  /** Initial password (env); replaced by a changed password once one is stored. */
   password: string;
   secret: Buffer;
+  /** Stored scrypt hash of a password changed through the profile page. */
+  getStoredHash?: () => string | undefined;
 }): Auth {
+  // Sessions are bound to the current password, so changing it logs out other sessions.
+  const generation = (): string =>
+    createHash("sha256")
+      .update(options.getStoredHash?.() ?? "")
+      .digest("hex")
+      .slice(0, 16);
   const sign = (expiry: string): string =>
     createHmac("sha256", options.secret)
-      .update(`session:${expiry}`)
+      .update(`session:${expiry}:${generation()}`)
       .digest("base64url");
   const failures = new Map<string, number[]>();
   const recent = (client: string, now: number): number[] =>
@@ -48,12 +80,16 @@ export function createAuth(options: {
 
   return {
     enabled: true,
-    checkCredentials: (user, password) =>
+    user: options.user,
+    checkCredentials: (user, password) => {
+      const stored = options.getStoredHash?.();
       // Evaluate both so timing does not reveal which part was wrong.
-      [
-        safeEqual(user, options.user),
-        safeEqual(password, options.password),
-      ].every(Boolean),
+      const userOk = safeEqual(user, options.user);
+      const passwordOk = stored
+        ? verifyPassword(password, stored)
+        : safeEqual(password, options.password);
+      return userOk && passwordOk;
+    },
     issueToken: (now = Date.now()) => {
       const expiry = String(now + SESSION_TTL_MS);
       return `${expiry}.${sign(expiry)}`;
@@ -79,6 +115,7 @@ export function createAuth(options: {
 /** Auth that lets everything through (AUTH_DISABLED=true). */
 export const noAuth: Auth = {
   enabled: false,
+  user: "",
   checkCredentials: () => true,
   issueToken: () => "",
   verifyToken: () => true,

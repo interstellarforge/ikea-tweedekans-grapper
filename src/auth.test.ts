@@ -1,6 +1,12 @@
 import { expect, test } from "vitest";
 
-import { createAuth, parseCookie, SESSION_TTL_MS } from "./auth.ts";
+import {
+  createAuth,
+  hashPassword,
+  parseCookie,
+  SESSION_TTL_MS,
+  verifyPassword,
+} from "./auth.ts";
 
 const auth = createAuth({
   user: "kees",
@@ -29,4 +35,25 @@ test("locks a client after repeated failures", () => {
   expect(auth.isLocked("1.2.3.4", 2000)).toBe(true);
   expect(auth.isLocked("5.6.7.8", 2000)).toBe(false);
   expect(auth.isLocked("1.2.3.4", 1000 + 16 * 60_000)).toBe(false);
+});
+
+test("changed password replaces the env password and invalidates old sessions", () => {
+  const state: { hash?: string } = {};
+  const a = createAuth({
+    user: "kees",
+    password: "envpassword",
+    secret: Buffer.alloc(32, 9),
+    getStoredHash: () => state.hash,
+  });
+  const oldToken = a.issueToken(1000);
+  expect(a.checkCredentials("kees", "envpassword")).toBe(true);
+  expect(a.verifyToken(oldToken, 2000)).toBe(true);
+
+  state.hash = hashPassword("new-password-123");
+  expect(verifyPassword("new-password-123", state.hash)).toBe(true);
+  expect(verifyPassword("nope", state.hash)).toBe(false);
+  expect(a.checkCredentials("kees", "new-password-123")).toBe(true);
+  expect(a.checkCredentials("kees", "envpassword")).toBe(false);
+  expect(a.verifyToken(oldToken, 2000)).toBe(false);
+  expect(a.verifyToken(a.issueToken(1000), 2000)).toBe(true);
 });

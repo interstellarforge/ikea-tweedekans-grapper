@@ -3,16 +3,195 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Watchlist · IKEA Tweedekans</title>
+    <title>Lijsten · IKEA Tweedekans</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .progress {
+        height: 10px;
+        background: var(--neutral-bg);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 8px 0 4px;
+      }
+      .progress > span {
+        display: block;
+        height: 100%;
+        background: var(--good);
+        transition: width 0.25s;
+      }
+      .item {
+        display: grid;
+        grid-template-columns: 64px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+      }
+      .item:first-child {
+        border-top: 0;
+      }
+      .item img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 8px;
+        background: var(--neutral-bg);
+      }
+      .item.done {
+        opacity: 0.55;
+      }
+      .item.done .ititle {
+        text-decoration: line-through;
+      }
+      .units {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin: 6px 0 2px;
+      }
+      .units input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin: 0;
+      }
+      .counter {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .counter button {
+        padding: 2px 10px;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-end;
+      }
+      .toolbar-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      dialog {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        color: var(--fg);
+        padding: 0;
+        width: min(640px, 94vw);
+      }
+      dialog::backdrop {
+        background: rgba(0, 0, 0, 0.55);
+      }
+      dialog .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      dialog .head h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      dialog .body {
+        padding: 16px 18px;
+        max-height: 70vh;
+        overflow: auto;
+      }
+      dialog .foot {
+        padding: 12px 18px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        align-items: center;
+      }
+      dialog textarea {
+        width: 100%;
+        min-height: 180px;
+        font: inherit;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .imp {
+        padding: 8px 0;
+        border-top: 1px solid var(--line);
+      }
+      .imp:first-child {
+        border-top: 0;
+      }
+      .imp .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+      }
+      .bar {
+        height: 6px;
+        background: var(--neutral-bg);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--brand);
+        transition: width 0.3s;
+      }
+      .bar.running > span {
+        width: 70%;
+        animation: pulse 1s ease-in-out infinite alternate;
+      }
+      .bar.ok > span {
+        width: 100%;
+        background: var(--good);
+      }
+      .bar.warn > span {
+        width: 100%;
+        background: var(--warn);
+      }
+      .bar.err > span {
+        width: 100%;
+        background: var(--bad);
+      }
+      @keyframes pulse {
+        from {
+          opacity: 0.45;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @media (max-width: 640px) {
+        .item {
+          grid-template-columns: 52px 1fr;
+        }
+        .item img {
+          width: 52px;
+          height: 52px;
+        }
+        .item .actions {
+          grid-column: 1 / -1;
+          flex-direction: row;
+          justify-content: space-between;
+          align-items: center;
+        }
+      }
+    </style>
   </head>
   <body>
     <main>
-      <h1>Watchlist</h1>
-      <p class="lead">
-        Producten die je in de gaten houdt. Je krijgt een melding zodra ze in de
-        tweedekanshoek van een gevolgd filiaal verschijnen.
-      </p>
+      <h1>Lijsten</h1>
       <a href="/trips" class="banner-good" id="tripBanner" hidden></a>
       <section class="panel" id="alertPanel" hidden>
         <div class="row">
@@ -22,8 +201,80 @@
         </div>
         <div id="alerts"></div>
       </section>
-      <div class="grid" id="items"></div>
+
+      <nav class="tabs" id="tabs">
+        <a href="#watchlist" data-for="watchlist">Watchlist</a>
+        <a href="#boodschappen" data-for="boodschappen">Boodschappenlijst</a>
+      </nav>
+
+      <div data-tab="watchlist">
+        <p class="lead">
+          Producten die je in de gaten houdt. Je krijgt een melding zodra ze in
+          de tweedekanshoek van een gevolgd filiaal verschijnen.
+        </p>
+        <div class="grid" id="items"></div>
+      </div>
+
+      <div data-tab="boodschappen" hidden>
+        <p class="lead">
+          Alles wat je nodig hebt. Streep af per stuk (of via "Gehaald" op de
+          Ritje-check): de Ritje-check en de meldingen rekenen alleen met wat je
+          nog nodig hebt.
+        </p>
+        <section class="panel">
+          <div class="toolbar-row">
+            <div style="flex: 1 1 260px">
+              <strong>Voortgang</strong>
+              <div id="summary" class="hint"></div>
+              <div class="progress">
+                <span id="bar" style="width: 0%"></span>
+              </div>
+            </div>
+            <button id="openPaste">Lijst plakken…</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Nog te halen</h2>
+          <div id="todo"></div>
+        </section>
+        <section class="panel" id="doneBox" hidden>
+          <h2>Gehaald</h2>
+          <div id="done"></div>
+        </section>
+      </div>
     </main>
+
+    <dialog id="pasteDialog">
+      <div class="head">
+        <h2>Lijst plakken</h2>
+        <button class="secondary" id="closeX" aria-label="Sluiten">✕</button>
+      </div>
+      <div class="body">
+        <div id="pasteStep">
+          <p class="hint">
+            Eén product per regel met het artikelnummer (met of zonder punten),
+            optioneel met aantal: <code>2x 802.045.62</code>,
+            <code>90591705 x3</code>, <code>10557036 4 stuks</code>. Dezelfde
+            lijst opnieuw plakken telt aantallen niet dubbel.
+          </p>
+          <textarea
+            id="paste"
+            placeholder="2x 802.045.62&#10;90591705 x3&#10;10557036"
+          ></textarea>
+        </div>
+        <div id="progressStep" hidden>
+          <div class="hint" id="overall"></div>
+          <div class="bar" id="overallBar"><span></span></div>
+          <div id="importRows" style="margin-top: 12px"></div>
+        </div>
+      </div>
+      <div class="foot">
+        <span id="importMsg" class="err"></span>
+        <button class="secondary" id="cancel">Annuleren</button>
+        <button id="startImport">Toevoegen</button>
+      </div>
+    </dialog>
+
     <script src="/assets/app.js"></script>
     <script>
       const {
@@ -201,6 +452,292 @@
         );
       }
 
+      // ---- Boodschappenlijst ----
+      async function setBought(item, bought) {
+        await send(`/api/watchlist/${item.articleNumber}/bought`, "PUT", {
+          bought,
+        });
+        loadList();
+      }
+
+      const MAX_UNIT_BOXES = 12;
+
+      const listRow = (i) => {
+        const remaining = i.quantity - i.bought;
+        const done = remaining <= 0;
+
+        let control;
+        if (i.quantity <= MAX_UNIT_BOXES) {
+          // One checkbox per unit: tick exactly what you picked up.
+          control = el(
+            "div",
+            { className: "units" },
+            ...Array.from({ length: i.quantity }, (_, idx) => {
+              const cb = el("input", {
+                type: "checkbox",
+                checked: idx < i.bought,
+                title: `Stuk ${idx + 1} van ${i.quantity}`,
+              });
+              cb.onchange = () => setBought(i, cb.checked ? idx + 1 : idx);
+              return cb;
+            }),
+            el("span", {
+              className: "meta",
+              textContent: `${i.bought} van ${i.quantity}`,
+            }),
+          );
+        } else {
+          const minus = el("button", {
+            className: "secondary",
+            textContent: "−",
+            disabled: i.bought <= 0,
+          });
+          minus.onclick = () => setBought(i, i.bought - 1);
+          const plus = el("button", {
+            className: "secondary",
+            textContent: "+",
+            disabled: done,
+          });
+          plus.onclick = () => setBought(i, i.bought + 1);
+          control = el(
+            "div",
+            { className: "units" },
+            el(
+              "span",
+              { className: "counter" },
+              minus,
+              el("strong", { textContent: `${i.bought} / ${i.quantity}` }),
+              plus,
+            ),
+          );
+        }
+
+        const rm = el("button", {
+          className: "secondary mini",
+          textContent: "Van lijst",
+        });
+        rm.onclick = async () => {
+          await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
+          loadList();
+          loadItems();
+        };
+        const chips = done ? [] : insightChips(i.insight, 2);
+        return el(
+          "div",
+          { className: `item${done ? " done" : ""}` },
+          el(
+            "a",
+            { href: `/product/${i.articleNumber}` },
+            el("img", { src: i.image || "", loading: "lazy", alt: "" }),
+          ),
+          el(
+            "div",
+            {},
+            el("a", {
+              className: "ititle",
+              href: `/product/${i.articleNumber}`,
+              style: "color:inherit;text-decoration:none;font-weight:700",
+              textContent: `${i.name} ${i.typeName}`.trim(),
+            }),
+            el("div", {
+              className: "meta",
+              textContent: `art. ${i.articleNumber}${i.measure ? " · " + i.measure : ""}`,
+            }),
+            control,
+            ...(chips.length
+              ? chips
+              : done
+                ? []
+                : [
+                    el(
+                      "div",
+                      { className: "chips" },
+                      chip("Nu niet in de tweedekanshoek"),
+                    ),
+                  ]),
+          ),
+          el("div", { className: "actions" }, rm),
+        );
+      };
+
+      async function loadList() {
+        const items = await api("/api/watchlist");
+        const todo = items.filter((i) => i.bought < i.quantity);
+        const done = items.filter((i) => i.bought >= i.quantity);
+        const units = items.reduce((n, i) => n + i.quantity, 0);
+        const got = items.reduce(
+          (n, i) => n + Math.min(i.bought, i.quantity),
+          0,
+        );
+        $("summary").textContent = items.length
+          ? `${got} van ${units} stuks gehaald · ${done.length} van ${items.length} producten klaar`
+          : "";
+        $("bar").style.width = units
+          ? `${Math.round((got / units) * 100)}%`
+          : "0%";
+        $("todo").replaceChildren(
+          ...(todo.length
+            ? todo.map(listRow)
+            : [
+                empty(
+                  items.length
+                    ? "Alles gehaald! 🎉"
+                    : 'Je lijst is leeg. Kies "Lijst plakken…" of voeg producten toe via Zoeken in producten.',
+                ),
+              ]),
+        );
+        $("doneBox").hidden = done.length === 0;
+        $("done").replaceChildren(...done.map(listRow));
+      }
+
+      // ---- Lijst plakken (modal met voortgang per regel) ----
+      const dialog = $("pasteDialog");
+      let importing = false;
+
+      const resetDialog = () => {
+        $("pasteStep").hidden = false;
+        $("progressStep").hidden = true;
+        $("importMsg").textContent = "";
+        $("startImport").textContent = "Toevoegen";
+        $("startImport").disabled = false;
+        $("cancel").textContent = "Annuleren";
+        $("cancel").hidden = false;
+        $("cancel").disabled = false;
+        $("closeX").disabled = false;
+        $("importRows").replaceChildren();
+      };
+      $("openPaste").onclick = () => {
+        resetDialog();
+        $("paste").value = "";
+        dialog.showModal();
+        $("paste").focus();
+      };
+      const closeDialog = () => {
+        if (importing) return;
+        dialog.close();
+        loadList();
+        loadItems();
+      };
+      $("closeX").onclick = closeDialog;
+      $("cancel").onclick = closeDialog;
+      dialog.addEventListener("cancel", (e) => {
+        if (importing) e.preventDefault();
+      });
+
+      $("startImport").onclick = async () => {
+        if ($("progressStep").hidden === false) return closeDialog();
+        $("importMsg").textContent = "";
+        let parsed;
+        try {
+          parsed = (
+            await send("/api/list/parse", "POST", { text: $("paste").value })
+          ).items;
+        } catch (e) {
+          $("importMsg").textContent = e.message;
+          return;
+        }
+        if (!parsed.length) {
+          $("importMsg").textContent = "Geen artikelnummers gevonden";
+          return;
+        }
+
+        importing = true;
+        $("pasteStep").hidden = true;
+        $("progressStep").hidden = false;
+        $("startImport").disabled = true;
+        $("cancel").disabled = true;
+        $("closeX").disabled = true;
+
+        const rows = parsed.map((item) => {
+          const label = el("span", {
+            textContent: `${item.quantity}× ${item.articleNumber}`,
+          });
+          const status = el("span", {
+            className: "meta",
+            textContent: "wacht…",
+          });
+          const bar = el("div", { className: "bar" }, el("span"));
+          const row = el(
+            "div",
+            { className: "imp" },
+            el("div", { className: "top" }, label, status),
+            bar,
+          );
+          return { item, label, status, bar, row };
+        });
+        $("importRows").replaceChildren(...rows.map((r) => r.row));
+
+        let done = 0;
+        const counts = {
+          added: 0,
+          updated: 0,
+          unchanged: 0,
+          unknown: 0,
+          failed: 0,
+        };
+        const tick = () => {
+          $("overall").textContent = `${done} van ${rows.length} verwerkt`;
+          $("overallBar").firstElementChild.style.width =
+            `${Math.round((done / rows.length) * 100)}%`;
+        };
+        tick();
+
+        for (const r of rows) {
+          r.bar.className = "bar running";
+          r.status.textContent = "opzoeken…";
+          try {
+            const res = await send("/api/list/item", "POST", {
+              articleNumber: r.item.articleNumber,
+              quantity: r.item.quantity,
+            });
+            counts[res.status] = (counts[res.status] ?? 0) + 1;
+            r.label.textContent = `${r.item.quantity}× ${res.name}`;
+            const texts = {
+              added: "toegevoegd",
+              updated: "aantal bijgewerkt",
+              unchanged: "stond er al",
+              unknown: "alleen artikelnummer (niet gevonden)",
+            };
+            r.status.textContent = texts[res.status] ?? res.status;
+            r.bar.className = `bar ${res.status === "unknown" ? "warn" : "ok"}`;
+          } catch (e) {
+            counts.failed += 1;
+            r.status.textContent = `mislukt: ${e.message}`;
+            r.bar.className = "bar err";
+          }
+          done += 1;
+          tick();
+        }
+
+        importing = false;
+        $("overall").textContent =
+          `Klaar: ${counts.added} toegevoegd, ${counts.updated} bijgewerkt, ${counts.unchanged} ongewijzigd` +
+          (counts.unknown ? `, ${counts.unknown} onbekend` : "") +
+          (counts.failed ? `, ${counts.failed} mislukt` : "");
+        $("startImport").textContent = "Sluiten";
+        $("startImport").disabled = false;
+        $("cancel").hidden = true;
+        $("closeX").disabled = false;
+        loadList();
+        loadItems();
+      };
+
+      // ---- Tabs (state in the URL hash) ----
+      const TABS = ["watchlist", "boodschappen"];
+      const showTab = () => {
+        const name = TABS.includes(location.hash.slice(1))
+          ? location.hash.slice(1)
+          : "watchlist";
+        document.querySelectorAll("[data-tab]").forEach((d) => {
+          d.hidden = d.dataset.tab !== name;
+        });
+        document.querySelectorAll("#tabs a").forEach((a) => {
+          a.classList.toggle("active", a.dataset.for === name);
+        });
+      };
+      window.addEventListener("hashchange", showTab);
+      showTab();
+
       $("seen").onclick = async () => {
         await send("/api/alerts/seen", "POST");
         loadAlerts();
@@ -208,11 +745,15 @@
       };
       loadAlerts();
       loadItems();
+      loadList();
       loadTrips();
       setInterval(() => {
-        if (document.activeElement?.tagName === "INPUT") return;
+        if (importing || dialog.open) return;
+        if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName))
+          return;
         loadAlerts();
         loadItems();
+        loadList();
         loadTrips();
       }, 60000);
     </script>

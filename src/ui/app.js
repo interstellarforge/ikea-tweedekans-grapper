@@ -190,13 +190,16 @@ const App = (() => {
   };
 
   const NAV = [
-    ["watchlist", "/watchlist", "Watchlist"],
+    ["watchlist", "/watchlist", "Lijsten"],
     ["catalog", "/catalog", "Zoeken in producten"],
     ["tweedekans", "/tweedekans", "Zoeken in tweedekanshoek"],
-    ["list", "/list", "Boodschappenlijst"],
     ["trips", "/trips", "Ritje-check"],
+  ];
+
+  const MENU = [
     ["alerts", "/alerts", "Meldingen"],
     ["settings", "/settings", "Instellingen"],
+    ["profile", "/profile", "Profiel"],
   ];
 
   const initShell = (active) => {
@@ -205,23 +208,65 @@ const App = (() => {
       "nav",
       {},
       ...NAV.map(([key, href, label]) =>
-        el(
-          "a",
-          { href, className: key === active ? "active" : "" },
-          label,
-          key === "alerts" ? badge : null,
-        ),
+        el("a", { href, className: key === active ? "active" : "" }, label),
       ),
     );
+
+    const initial = el("span", {
+      className: "avatar-letter",
+      textContent: "·",
+    });
+    const avatar = el(
+      "button",
+      {
+        className: `avatar${MENU.some(([k]) => k === active) ? " active" : ""}`,
+        ariaLabel: "Profiel en menu",
+        ariaHaspopup: "true",
+        ariaExpanded: "false",
+      },
+      initial,
+      badge,
+    );
+    const menuBadge = el("span", { className: "count", hidden: true });
+    const who = el("div", { className: "menu-who", textContent: "" });
     const logout = el("button", {
-      className: "secondary",
+      className: "menu-item",
       textContent: "Uitloggen",
-      style: "margin-left:auto;color:#fff;border-color:rgba(255,255,255,.4)",
     });
     logout.onclick = async () => {
       await fetch("/api/logout", { method: "POST" });
       location.href = "/login";
     };
+    const menu = el(
+      "div",
+      { className: "menu", role: "menu", hidden: true },
+      who,
+      ...MENU.map(([key, href, label]) =>
+        el(
+          "a",
+          { href, className: `menu-item${key === active ? " active" : ""}` },
+          label,
+          key === "alerts" ? menuBadge : null,
+        ),
+      ),
+      el("hr"),
+      logout,
+    );
+    const setOpen = (open) => {
+      menu.hidden = !open;
+      avatar.setAttribute("aria-expanded", String(open));
+    };
+    avatar.onclick = (e) => {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    };
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setOpen(false);
+    });
+
     document.body.prepend(
       el(
         "header",
@@ -231,15 +276,28 @@ const App = (() => {
           { className: "inner" },
           el("a", { className: "brand", href: "/" }, "IKEA TWEEDEKANS"),
           nav,
-          logout,
+          el("div", { className: "profile" }, avatar, menu),
         ),
       ),
     );
+
+    api("/api/profile")
+      .then((p) => {
+        const name = p.username || "gebruiker";
+        initial.textContent = name.charAt(0).toUpperCase();
+        who.textContent = name;
+      })
+      .catch(() => {
+        /* the menu still works without the name */
+      });
+
     const refresh = async () => {
       try {
         const { unseen } = await api("/api/alerts?limit=1");
-        badge.hidden = unseen === 0;
-        badge.textContent = unseen;
+        for (const b of [badge, menuBadge]) {
+          b.hidden = unseen === 0;
+          b.textContent = unseen;
+        }
         document.title = `${unseen ? `(${unseen}) ` : ""}${document.title.replace(/^\(\d+\) /, "")}`;
       } catch {
         /* shell badge is best effort */

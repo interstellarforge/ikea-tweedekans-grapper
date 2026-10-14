@@ -352,3 +352,25 @@ export function saveSettings(
   }
   return undefined;
 }
+
+/** Raw key/value access for values that are not part of the settings form (e.g. password hash). */
+export function getRawSetting(
+  db: DatabaseSync,
+  key: string,
+): string | undefined {
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value;
+}
+
+export function setRawSetting(
+  db: DatabaseSync,
+  key: string,
+  value: string,
+): void {
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+  ).run(key, value);
+}

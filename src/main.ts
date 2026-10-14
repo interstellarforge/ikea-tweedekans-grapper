@@ -1,11 +1,14 @@
+import type { DatabaseSync } from "node:sqlite";
+
 import { type Auth, createAuth, noAuth } from "./auth.ts";
 import { config } from "./config.ts";
 import { openDb } from "./db.ts";
 import { startPolling } from "./poller.ts";
 import { deriveKey } from "./secrets.ts";
 import { createApp } from "./server.ts";
+import { getRawSetting } from "./settings.ts";
 
-function buildAuth(): Auth {
+function buildAuth(db: DatabaseSync): Auth {
   if (config.authDisabled) {
     console.warn("[auth] AUTH_DISABLED=true: the web UI is NOT protected");
     return noAuth;
@@ -20,11 +23,12 @@ function buildAuth(): Auth {
     user: config.authUser,
     password: config.authPassword,
     secret: deriveKey("session"),
+    getStoredHash: () => getRawSetting(db, "auth.passwordHash"),
   });
 }
 
-const auth = buildAuth();
 const db = openDb(config.dbPath);
+const auth = buildAuth(db);
 const stopPolling = startPolling(db);
 const server = createApp(db, auth).listen(config.port, config.host, () => {
   console.log(`listening on http://${config.host}:${String(config.port)}`);

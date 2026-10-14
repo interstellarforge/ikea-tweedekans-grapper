@@ -348,3 +348,126 @@ a.btn {
 .banner-warn strong {
   font-weight: 800;
 }
+
+/* header: nav left, profile menu right */
+header.shell .inner {
+  flex-wrap: nowrap;
+  gap: 16px;
+}
+header.shell nav {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+}
+header.shell nav a {
+  white-space: nowrap;
+}
+.profile {
+  position: relative;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.avatar:hover,
+.avatar.active {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #fff;
+}
+.avatar .count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  margin: 0;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 210px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+  z-index: 30;
+}
+.menu[hidden] {
+  display: none;
+}
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 0;
+}
+.menu-who {
+  padding: 8px 10px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  text-decoration: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover,
+.menu-item.active {
+  background: var(--neutral-bg);
+}
+.menu .count {
+  margin-left: 8px;
+}
+/* compact action button used inside route lists */
+button.mini {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.tabs a {
+  padding: 10px 16px;
+  text-decoration: none;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a.active {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--brand);
+}
+[data-tab][hidden] {
+  display: none;
+}

@@ -10,6 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import {
   type Auth,
+  hashPassword,
   parseCookie,
   SESSION_COOKIE,
   SESSION_TTL_MS,
@@ -40,6 +41,7 @@ import { pollAll, pollStatus } from "./poller.ts";
 import {
   getSettings,
   saveSettings,
+  setRawSetting,
   type SettingsInput,
   toPublic,
 } from "./settings.ts";
@@ -86,7 +88,7 @@ const PAGES: Record<string, string> = {
   "/catalog": "catalog.html",
   "/tweedekans": "tweedekans.html",
   "/alerts": "alerts.html",
-  "/list": "list.html",
+  "/profile": "profile.html",
   "/trips": "trips.html",
   "/settings": "settings.html",
 };
@@ -189,6 +191,36 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       return;
     }
 
+    if (authed && method === "GET" && path === "/api/profile") {
+      send(res, 200, { username: auth.user, authEnabled: auth.enabled });
+      return;
+    }
+
+    if (authed && method === "PUT" && path === "/api/profile/password") {
+      if (!auth.enabled) {
+        send(res, 400, { error: "Inloggen staat uit (AUTH_DISABLED)" });
+        return;
+      }
+      const body = await readJson(req);
+      const next = str(body["next"]);
+      if (!auth.checkCredentials(auth.user, str(body["current"]))) {
+        send(res, 400, { error: "Huidig wachtwoord klopt niet" });
+        return;
+      }
+      if (next.length < 8) {
+        send(res, 400, { error: "Nieuw wachtwoord: minimaal 8 tekens" });
+        return;
+      }
+      setRawSetting(db, "auth.passwordHash", hashPassword(next));
+      // The session is bound to the password: hand this browser a fresh one.
+      res.setHeader(
+        "set-cookie",
+        `${SESSION_COOKIE}=${auth.issueToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(SESSION_TTL_MS / 1000)}${secure ? "; Secure" : ""}`,
+      );
+      send(res, 200, { ok: true });
+      return;
+    }
+
     if (method === "POST" && path === "/api/logout") {
       res.setHeader(
         "set-cookie",
@@ -212,6 +244,11 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
     if (method === "GET") {
       if (path === "/") {
         res.writeHead(302, { location: "/watchlist" });
+        res.end();
+        return;
+      }
+      if (path === "/list") {
+        res.writeHead(302, { location: "/watchlist#boodschappen" });
         res.end();
         return;
       }
@@ -535,64 +572,65 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       return;
     }
 
-    if (method === "POST" && path === "/api/list/import") {
+    if (method === "POST" && path === "/api/list/parse") {
       const body = await readJson(req);
-      const parsed = parseShoppingList(str(body["text"]));
-      if (parsed.length === 0) {
-        send(res, 400, { error: "Geen artikelnummers gevonden" });
-        return;
-      }
-      if (parsed.length > 200) {
-        send(res, 400, { error: "Maximaal 200 artikelen tegelijk" });
-        return;
-      }
-      const existing = new Map(
-        listWatchItems(db).map((w) => [w.articleNumber, w.quantity]),
+      const items = parseShoppingList(str(body["text"])).slice(0, 200);
+      send(res, 200, { items });
+      return;
+    }
+
+    if (method === "POST" && path === "/api/list/item") {
+      const body = await readJson(req);
+      const articleNumber = str(body["articleNumber"]);
+      const quantity = Math.min(
+        Math.max(Math.round(Number(body["quantity"]) || 1), 1),
+        99,
       );
-      let added = 0;
-      let updated = 0;
-      const unknown: string[] = [];
-      // Look product details up a few at a time.
-      for (let i = 0; i < parsed.length; i += 4) {
-        await Promise.all(
-          parsed.slice(i, i + 4).map(async (item) => {
-            const current = existing.get(item.articleNumber);
-            if (current !== undefined) {
-              // Importing the same list again must not double the quantities.
-              if (item.quantity > current) {
-                setQuantity(db, item.articleNumber, item.quantity);
-                updated += 1;
-              }
-              return;
-            }
-            let product: CatalogProduct | undefined;
-            try {
-              product = (await searchCatalog(item.articleNumber)).find(
-                (p) => p.articleNumber === item.articleNumber,
-              );
-            } catch {
-              product = undefined;
-            }
-            const fallback = offerProductInfo(db, item.articleNumber);
-            if (!product && !fallback) unknown.push(item.articleNumber);
-            addWatchItem(
-              db,
-              product ?? {
-                articleNumber: item.articleNumber,
-                name: fallback?.title ?? item.articleNumber,
-                typeName: fallback?.description ?? "",
-                measure: "",
-                image: fallback?.image,
-                url: undefined,
-              },
-              Date.now(),
-            );
-            setQuantity(db, item.articleNumber, item.quantity);
-            added += 1;
-          }),
-        );
+      if (!/^\d{8}$/.test(articleNumber)) {
+        send(res, 400, { error: "invalid articleNumber" });
+        return;
       }
-      send(res, 200, { added, updated, unknown });
+      const current = listWatchItems(db).find(
+        (w) => w.articleNumber === articleNumber,
+      );
+      if (current) {
+        // Adding the same list again must not double the quantities.
+        const changed = quantity > current.quantity;
+        if (changed) setQuantity(db, articleNumber, quantity);
+        send(res, 200, {
+          status: changed ? "updated" : "unchanged",
+          name: `${current.name} ${current.typeName}`.trim(),
+        });
+        return;
+      }
+      let product: CatalogProduct | undefined;
+      try {
+        product = (await searchCatalog(articleNumber)).find(
+          (p) => p.articleNumber === articleNumber,
+        );
+      } catch {
+        product = undefined;
+      }
+      const fallback = offerProductInfo(db, articleNumber);
+      addWatchItem(
+        db,
+        product ?? {
+          articleNumber,
+          name: fallback?.title ?? articleNumber,
+          typeName: fallback?.description ?? "",
+          measure: "",
+          image: fallback?.image,
+          url: undefined,
+        },
+        Date.now(),
+      );
+      setQuantity(db, articleNumber, quantity);
+      send(res, 200, {
+        status: product || fallback ? "added" : "unknown",
+        name: product
+          ? `${product.name} ${product.typeName}`.trim()
+          : (fallback?.title ?? articleNumber),
+      });
       return;
     }
 

@@ -323,7 +323,12 @@ export function findBestRoute(input: {
   consumptionPer100km: number;
   wants: RouteWant[];
   offers: RouteOffer[];
-}): { best: RouteResult | undefined; bestSingle: RouteResult | undefined } {
+}): {
+  best: RouteResult | undefined;
+  bestSingle: RouteResult | undefined;
+  /** Best route per store combination that is profitable, best first (max 6). */
+  top: RouteResult[];
+} {
   const byArticle = indexOffers(input.offers);
   const wanted = new Set(input.wants.map((w) => w.articleNumber));
   const useful = input.storeIds.filter((id) =>
@@ -331,6 +336,7 @@ export function findBestRoute(input: {
   );
   let best: RouteResult | undefined;
   let bestSingle: RouteResult | undefined;
+  const candidates: RouteResult[] = [];
   const better = (a: RouteResult, b: RouteResult | undefined): boolean =>
     !b || a.net > b.net || (a.net === b.net && a.totalKm < b.totalKm);
 
@@ -351,6 +357,7 @@ export function findBestRoute(input: {
         size <= EXACT_ORDER_MAX_STOPS
           ? permutations(subset)
           : [heuristicOrder(subset, homeKm, betweenKm)];
+      let bestOfSubset: RouteResult | undefined;
       for (const order of orders) {
         const first = order[0] ?? "";
         const last = order[order.length - 1] ?? "";
@@ -393,10 +400,17 @@ export function findBestRoute(input: {
         };
         if (better(result, best)) best = result;
         if (size === 1 && better(result, bestSingle)) bestSingle = result;
+        if (better(result, bestOfSubset)) bestOfSubset = result;
+      }
+      if (bestOfSubset && bestOfSubset.status !== "bad") {
+        candidates.push(bestOfSubset);
       }
     }
   }
-  return { best, bestSingle };
+  const top = candidates
+    .sort((a, b) => b.net - a.net || a.totalKm - b.totalKm)
+    .slice(0, 6);
+  return { best, bestSingle, top };
 }
 
 const toRad = (d: number): number => (d * Math.PI) / 180;
@@ -535,6 +549,8 @@ export type TripsResponse =
       wantedUnits: number;
       stores: StoreTrip[];
       bestRoute: BestRoute | undefined;
+      /** Other profitable store combinations (best first). */
+      alternatives: BestRoute[];
     };
 
 /** Driving legs between stores (directed), via one OSRM table request; cached. */
@@ -737,7 +753,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     km: Number.POSITIVE_INFINITY,
     minutes: Number.POSITIVE_INFINITY,
   };
-  const { best, bestSingle } = findBestRoute({
+  const { best, bestSingle, top } = findBestRoute({
     storeIds,
     maxStops: settings.maxStops,
     stopMinutes: settings.stopMinutes,
@@ -751,10 +767,9 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   });
 
   const storeOf = (id: string) => storeList.find((s) => s.storeId === id);
-  let bestRoute: BestRoute | undefined;
-  if (best) {
+  const toView = (route: RouteResult): BestRoute => {
     let prev: string | undefined;
-    const stops = best.stops.map((stop): RouteStopView => {
+    const stops = route.stops.map((stop): RouteStopView => {
       const leg = prev
         ? storeLeg(db, prev, stop.storeId)
         : (homeLegs.get(stop.storeId) ?? { km: 0, minutes: 0 });
@@ -770,15 +785,27 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
       };
     });
     const singleStore = bestSingle?.stops[0]?.storeId;
-    bestRoute = {
-      ...best,
+    return {
+      ...route,
       stops,
-      gainOverSingle: bestSingle ? round2(best.net - bestSingle.net) : 0,
+      gainOverSingle: bestSingle ? round2(route.net - bestSingle.net) : 0,
       bestSingleName: singleStore ? storeOf(singleStore)?.name : undefined,
       bestSingleNet: bestSingle?.net,
       approximateOrder: stops.length > EXACT_ORDER_MAX_STOPS,
     };
-  }
+  };
+  const bestRoute = best ? toView(best) : undefined;
+  // Profitable alternatives: other store combinations, best first (the best route excluded).
+  const keyOf = (r: BestRoute): string =>
+    r.stops
+      .map((st) => st.storeId)
+      .sort()
+      .join();
+  const bestKey = bestRoute ? keyOf(bestRoute) : undefined;
+  const alternatives = top
+    .map(toView)
+    .filter((r) => keyOf(r) !== bestKey)
+    .slice(0, 5);
 
   return {
     configured: true,
@@ -792,5 +819,6 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     wantedUnits: watch.reduce((s, w) => s + w.quantity, 0),
     stores,
     bestRoute,
+    alternatives,
   };
 }
