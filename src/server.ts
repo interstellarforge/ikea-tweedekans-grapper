@@ -319,6 +319,20 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
         }
       }
       const error = saveSettings(db, input);
+      if (!error && input.countries) {
+        // Make the stores of newly enabled countries visible right away.
+        const known = new Set(
+          listStores(db, { includeDisabled: true }).map((st) => st.country),
+        );
+        for (const country of input.countries) {
+          if (known.has(country)) continue;
+          try {
+            upsertStores(db, await fetchStores(country), country);
+          } catch (e) {
+            console.error(`[settings] store list (${country}) failed:`, e);
+          }
+        }
+      }
       if (error) send(res, 400, { error });
       else send(res, 200, toPublic(getSettings(db)));
       return;

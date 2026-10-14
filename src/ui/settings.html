@@ -634,7 +634,16 @@
                 await send("/api/settings", "PUT", { countries: chosen });
                 await send("/api/sync", "POST");
                 flash("countryMsg", "Opgeslagen — filialen worden opgehaald…");
-                setTimeout(loadStores, 4000);
+                await loadStores();
+                // Wait until the sync that includes this change is finished.
+                for (let i = 0; i < 90; i++) {
+                  await new Promise((r) => setTimeout(r, 2000));
+                  const st = await api("/api/status");
+                  await loadStores();
+                  await loadStatus();
+                  if (!st.running) break;
+                }
+                flash("countryMsg", "Klaar — aanbiedingen zijn opgehaald.");
               } catch (e) {
                 flash("countryMsg", e.message, true);
               }

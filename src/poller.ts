@@ -78,29 +78,47 @@ export async function pollStore(
   }
 }
 
-/** Syncs every store of the configured country. No-op when already running. */
+const runState = { rerunRequested: false };
+const rerunWasRequested = (): boolean => runState.rerunRequested;
+
+async function pollOnce(db: DatabaseSync): Promise<void> {
+  for (const country of getSettings(db).countries) {
+    try {
+      upsertStores(db, await fetchStores(country), country);
+    } catch (error) {
+      console.error(
+        `[poll] store list (${country}) failed:`,
+        errorMessage(error),
+      );
+    }
+  }
+  for (const store of listStores(db)) {
+    try {
+      const added = await pollStore(db, store.storeId);
+      console.log(`[poll] ${store.name}: ${String(added)} new`);
+    } catch (error) {
+      console.error(`[poll] ${store.name} failed:`, errorMessage(error));
+    }
+  }
+}
+
+/**
+ * Syncs every store of the enabled countries. When a run is already in progress this schedules
+ * one more run right after it (settings such as the enabled countries may have changed).
+ */
 export async function pollAll(db: DatabaseSync): Promise<void> {
-  if (pollStatus.running) return;
+  if (pollStatus.running) {
+    runState.rerunRequested = true;
+    return;
+  }
   pollStatus.running = true;
   pollStatus.startedAt = Date.now();
   try {
-    for (const country of getSettings(db).countries) {
-      try {
-        upsertStores(db, await fetchStores(country), country);
-      } catch (error) {
-        console.error(
-          `[poll] store list (${country}) failed:`,
-          errorMessage(error),
-        );
-      }
-    }
-    for (const store of listStores(db)) {
-      try {
-        const added = await pollStore(db, store.storeId);
-        console.log(`[poll] ${store.name}: ${String(added)} new`);
-      } catch (error) {
-        console.error(`[poll] ${store.name} failed:`, errorMessage(error));
-      }
+    let again = true;
+    while (again) {
+      runState.rerunRequested = false;
+      await pollOnce(db);
+      again = rerunWasRequested();
     }
   } finally {
     pollStatus.running = false;
