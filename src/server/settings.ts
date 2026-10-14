@@ -1,7 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
-
 import { config } from "./config.ts";
 import { COUNTRY_CODES, DEFAULT_COUNTRIES, isCountry } from "./countries.ts";
+import type { Db } from "./db.ts";
 import { decryptSecret, encryptSecret } from "./secrets.ts";
 
 // ---------------------------------------------------------------- global (admin) settings
@@ -51,7 +50,7 @@ const ALL_CHANNELS: ChannelFlags = {
 };
 
 function rawMap(
-  db: DatabaseSync,
+  db: Db,
   table: "settings" | "user_settings",
   userId?: number,
 ): Map<string, string> {
@@ -75,7 +74,7 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
   }
 }
 
-export function getGlobalSettings(db: DatabaseSync): GlobalSettings {
+export function getGlobalSettings(db: Db): GlobalSettings {
   const map = rawMap(db, "settings");
   const interval = Number(map.get("pollIntervalMin"));
   const port = Number(map.get("email.port"));
@@ -109,7 +108,7 @@ export function toPublicGlobal(g: GlobalSettings): PublicGlobalSettings {
 }
 
 function putAll(
-  db: DatabaseSync,
+  db: Db,
   table: "settings" | "user_settings",
   userId: number,
   writes: [string, string][],
@@ -139,7 +138,7 @@ function putAll(
 
 /** Validates and stores admin settings; returns an error message for invalid input. */
 export function saveGlobalSettings(
-  db: DatabaseSync,
+  db: Db,
   input: GlobalSettingsInput,
 ): string | undefined {
   const writes: [string, string][] = [];
@@ -267,10 +266,7 @@ const num = (
     : fallback;
 };
 
-export function getUserSettings(
-  db: DatabaseSync,
-  userId: number,
-): UserSettings {
+export function getUserSettings(db: Db, userId: number): UserSettings {
   const map = rawMap(db, "user_settings", userId);
   const d = userDefaults();
   const flag = (key: string, fallback: boolean): boolean =>
@@ -310,7 +306,7 @@ export function toPublicUser(s: UserSettings): PublicUserSettings {
 
 /** Validates and stores one user's settings; returns an error message for invalid input. */
 export function saveUserSettings(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   input: UserSettingsInput,
 ): string | undefined {
@@ -406,21 +402,14 @@ export function saveUserSettings(
 // ---------------------------------------------------------------- raw (global) key/value
 
 /** Raw key/value access for values that are not part of the settings forms. */
-export function getRawSetting(
-  db: DatabaseSync,
-  key: string,
-): string | undefined {
+export function getRawSetting(db: Db, key: string): string | undefined {
   const row = db
     .prepare("SELECT value FROM settings WHERE key = ?")
     .get(key) as { value: string } | undefined;
   return row?.value;
 }
 
-export function setRawSetting(
-  db: DatabaseSync,
-  key: string,
-  value: string,
-): void {
+export function setRawSetting(db: Db, key: string, value: string): void {
   db.prepare(
     `INSERT INTO settings (key, value) VALUES (?, ?)
      ON CONFLICT (key) DO UPDATE SET value = excluded.value`,

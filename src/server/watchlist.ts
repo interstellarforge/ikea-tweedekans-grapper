@@ -1,5 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
-
+import type { Db } from "./db.ts";
 import type { CatalogProduct } from "./ikea-client.ts";
 
 export type WatchItem = CatalogProduct & {
@@ -32,7 +31,7 @@ export type Alert = {
 };
 
 export function addWatchItem(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   p: CatalogProduct,
   now: number,
@@ -53,7 +52,7 @@ export function addWatchItem(
 }
 
 export function removeWatchItem(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   articleNumber: string,
 ): void {
@@ -64,7 +63,7 @@ export function removeWatchItem(
 
 /** The user's watchlist; availability only counts stores of the given countries. */
 export function listWatchItems(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   countries: string[],
 ): WatchItem[] {
@@ -102,7 +101,7 @@ export function listWatchItems(
 }
 
 export function setQuantity(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   articleNumber: string,
   quantity: number,
@@ -113,7 +112,7 @@ export function setQuantity(
 }
 
 export function setBought(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   articleNumber: string,
   bought: number,
@@ -125,7 +124,7 @@ export function setBought(
 
 /** Ticks off units of watchlist-only items; never goes beyond the quantity needed. */
 export function markPurchased(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   items: { articleNumber: string; count: number }[],
 ): void {
@@ -141,7 +140,7 @@ export function markPurchased(
 
 /** True while this user still has something left to buy of this watched article. */
 export function isWatched(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   articleNumber: string,
 ): boolean {
@@ -154,11 +153,7 @@ export function isWatched(
   );
 }
 
-export function recordAlert(
-  db: DatabaseSync,
-  userId: number,
-  alert: Alert,
-): boolean {
+export function recordAlert(db: Db, userId: number, alert: Alert): boolean {
   const res = db
     .prepare(
       `INSERT OR IGNORE INTO alerts (user_id, store_id, offer_number, article_number, title, description, price, store_name, created_at, seen, note, delivery, country)
@@ -182,7 +177,7 @@ export function recordAlert(
 }
 
 export function setAlertDelivery(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   storeId: string,
   offerNumber: string,
@@ -197,7 +192,7 @@ export type AlertPage = { total: number; unseen: number; items: Alert[] };
 
 /** One user's alert history, newest first. */
 export function listAlerts(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   limit = 50,
   offset = 0,
@@ -226,7 +221,7 @@ export function listAlerts(
   };
 }
 
-export function markAlertsSeen(db: DatabaseSync, userId: number): void {
+export function markAlertsSeen(db: Db, userId: number): void {
   db.prepare("UPDATE alerts SET seen = 1 WHERE user_id = ? AND seen = 0").run(
     userId,
   );

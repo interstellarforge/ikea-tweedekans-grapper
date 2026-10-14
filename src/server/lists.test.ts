@@ -51,6 +51,7 @@ test("lists track pieces, prices and what is still needed", () => {
   );
   const kitchen = createList(db, me, "Keuken", 1);
   const bedroom = createList(db, me, "Slaapkamer", 1);
+
   expect(addListItem(db, kitchen, product("70277981", 9), 4, "max", 1)).toBe(
     "added",
   );
@@ -63,8 +64,10 @@ test("lists track pieces, prices and what is still needed", () => {
 
   // not watched yet: nothing is monitored
   expect(isWatched(db, me, "70277981")).toBe(false);
+
   const itemId = getLists(db, me, NL)[0]?.items[0]?.id ?? 0;
   setItemWatched(db, me, itemId, true, 2);
+
   expect(isWatched(db, me, "70277981")).toBe(true);
   // needed = remaining over both lists
   expect(listWatchItems(db, me, NL)[0]?.needed).toBe(6);
@@ -72,7 +75,9 @@ test("lists track pieces, prices and what is still needed", () => {
   // bought 1 piece at EUR 3.50: remaining 3 in kitchen
   expect(recordPieces(db, itemId, [3.5], "Amsterdam", 3)).toBe(1);
   expect(listWatchItems(db, me, NL)[0]?.needed).toBe(5);
+
   const view = getLists(db, me, NL)[0];
+
   expect(view?.items[0]).toMatchObject({
     bought: 1,
     remaining: 3,
@@ -98,6 +103,7 @@ test("lists track pieces, prices and what is still needed", () => {
     [{ articleNumber: "70277981", count: 2, unitPrice: 4 }],
     5,
   );
+
   expect(getLists(db, me, NL)[1]?.items[0]?.bought).toBe(2);
   expect(listWatchItems(db, me, NL)[0]?.needed).toBe(0);
 });
@@ -122,5 +128,6 @@ test("lists, items and purchases belong to one user only", () => {
     [{ articleNumber: "70277981", count: 1, unitPrice: 3 }],
     3,
   );
+
   expect(getLists(db, 1, NL)[0]?.items[0]?.bought).toBe(1);
 });

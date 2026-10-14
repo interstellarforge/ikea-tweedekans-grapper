@@ -1,0 +1,27 @@
+.product-page .product-hero {
+  display: grid;
+  grid-template-columns: minmax(160px, 280px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.product-page .product-hero img {
+  width: 100%;
+  border-radius: 10px;
+  background: var(--neutral-bg);
+}
+.product-page .table-wrap {
+  overflow-x: auto;
+}
+.product-page button.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--link);
+  cursor: pointer;
+  font: inherit;
+}
+@media (max-width: 600px) {
+  .product-page .product-hero {
+    grid-template-columns: 1fr;
+  }
+}

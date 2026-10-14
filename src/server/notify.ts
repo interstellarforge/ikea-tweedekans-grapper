@@ -1,9 +1,8 @@
-import type { DatabaseSync } from "node:sqlite";
-
 import nodemailer from "nodemailer";
 
 import { config } from "./config.ts";
 import { COUNTRIES, isCountry } from "./countries.ts";
+import type { Db } from "./db.ts";
 import type { Ctx } from "./db.ts";
 import type { PriceTag } from "./insights.ts";
 import {
@@ -239,7 +238,7 @@ export type ChannelName = "ntfy" | "email" | "homeAssistant";
 
 /** What can actually be used for this user: visible (admin) + wanted (user) + configured. */
 export function channelStatus(
-  db: DatabaseSync,
+  db: Db,
   user: User,
 ): Record<
   ChannelName,
@@ -283,7 +282,7 @@ export type Message = {
  * Returns a per-channel result summary.
  */
 export async function deliver(
-  db: DatabaseSync,
+  db: Db,
   user: User,
   msg: Message,
   only?: ChannelName,
@@ -364,11 +363,7 @@ ${msg.links.click}
  * Content for a test notification. Uses a real current offer so that tapping it behaves exactly
  * like a real alert (opens that offer at IKEA); falls back to a generic message without offers.
  */
-export function testContent(
-  db: DatabaseSync,
-  ctx: Ctx,
-  fallbackBody: string,
-): Message {
+export function testContent(db: Db, ctx: Ctx, fallbackBody: string): Message {
   const marks = ctx.countries.map(() => "?").join(",");
   const row = db
     .prepare(
@@ -415,7 +410,7 @@ export function testContent(
 
 /** Sends an alert to one user over their active channels; returns a per-channel summary. */
 export async function notifyAlert(
-  db: DatabaseSync,
+  db: Db,
   user: User,
   alert: Alert,
 ): Promise<string> {

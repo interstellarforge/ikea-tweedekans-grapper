@@ -4,34 +4,190 @@
   "title": "Design System: IKEA Tweedekans",
   "extensions": {
     "colorMeta": {
-      "blue": { "role": "primary", "displayName": "IKEA Blue", "canonical": "#0058a3", "tonalRamp": ["#00203d", "#003e75", "#0058a3", "#2f7cc0", "#5c9ad0", "#8ebbe1", "#c0d8ee", "#e3effa"] },
-      "blue-strong": { "role": "primary", "displayName": "Deep Blue", "canonical": "#003e75", "tonalRamp": ["#001a33", "#002a50", "#003e75", "#0058a3", "#3a7fbd", "#7aa9d3", "#b5cfe6", "#e3effa"] },
-      "yellow": { "role": "secondary", "displayName": "IKEA Yellow", "canonical": "#ffdb00", "tonalRamp": ["#4d4200", "#807000", "#b39a00", "#f2c800", "#ffdb00", "#ffe74d", "#fff08a", "#fff8c2"] },
-      "fg": { "role": "neutral", "displayName": "Ink", "canonical": "#111a24", "tonalRamp": ["#111a24", "#2b3541", "#566170", "#7d8896", "#a5aeba", "#bcc5d1", "#d9dfe7", "#f3f5f8"] },
-      "bg": { "role": "neutral", "displayName": "Mist", "canonical": "#f3f5f8", "tonalRamp": ["#111a24", "#566170", "#8c97a5", "#bcc5d1", "#d9dfe7", "#e8ecf1", "#eef1f5", "#f3f5f8"] },
-      "good": { "role": "status", "displayName": "Receipt Green", "canonical": "#17703f", "tonalRamp": ["#0b3a20", "#115430", "#17703f", "#3b9262", "#6fb48d", "#a3d1b7", "#dcf3e5", "#eef9f2"] },
-      "bad": { "role": "status", "displayName": "Alert Red", "canonical": "#b3261e", "tonalRamp": ["#5c120f", "#861c16", "#b3261e", "#d0564f", "#e38882", "#f0b3af", "#fde6e3", "#fef3f1"] },
-      "warn": { "role": "status", "displayName": "Amber Warning", "canonical": "#8f4a00", "tonalRamp": ["#3d2000", "#663500", "#8f4a00", "#b86b14", "#d4954a", "#e8bb85", "#ffecc9", "#fff6e3"] }
+      "blue": {
+        "role": "primary",
+        "displayName": "IKEA Blue",
+        "canonical": "#0058a3",
+        "tonalRamp": [
+          "#00203d",
+          "#003e75",
+          "#0058a3",
+          "#2f7cc0",
+          "#5c9ad0",
+          "#8ebbe1",
+          "#c0d8ee",
+          "#e3effa"
+        ]
+      },
+      "blue-strong": {
+        "role": "primary",
+        "displayName": "Deep Blue",
+        "canonical": "#003e75",
+        "tonalRamp": [
+          "#001a33",
+          "#002a50",
+          "#003e75",
+          "#0058a3",
+          "#3a7fbd",
+          "#7aa9d3",
+          "#b5cfe6",
+          "#e3effa"
+        ]
+      },
+      "yellow": {
+        "role": "secondary",
+        "displayName": "IKEA Yellow",
+        "canonical": "#ffdb00",
+        "tonalRamp": [
+          "#4d4200",
+          "#807000",
+          "#b39a00",
+          "#f2c800",
+          "#ffdb00",
+          "#ffe74d",
+          "#fff08a",
+          "#fff8c2"
+        ]
+      },
+      "fg": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#111a24",
+        "tonalRamp": [
+          "#111a24",
+          "#2b3541",
+          "#566170",
+          "#7d8896",
+          "#a5aeba",
+          "#bcc5d1",
+          "#d9dfe7",
+          "#f3f5f8"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "canonical": "#f3f5f8",
+        "tonalRamp": [
+          "#111a24",
+          "#566170",
+          "#8c97a5",
+          "#bcc5d1",
+          "#d9dfe7",
+          "#e8ecf1",
+          "#eef1f5",
+          "#f3f5f8"
+        ]
+      },
+      "good": {
+        "role": "status",
+        "displayName": "Receipt Green",
+        "canonical": "#17703f",
+        "tonalRamp": [
+          "#0b3a20",
+          "#115430",
+          "#17703f",
+          "#3b9262",
+          "#6fb48d",
+          "#a3d1b7",
+          "#dcf3e5",
+          "#eef9f2"
+        ]
+      },
+      "bad": {
+        "role": "status",
+        "displayName": "Alert Red",
+        "canonical": "#b3261e",
+        "tonalRamp": [
+          "#5c120f",
+          "#861c16",
+          "#b3261e",
+          "#d0564f",
+          "#e38882",
+          "#f0b3af",
+          "#fde6e3",
+          "#fef3f1"
+        ]
+      },
+      "warn": {
+        "role": "status",
+        "displayName": "Amber Warning",
+        "canonical": "#8f4a00",
+        "tonalRamp": [
+          "#3d2000",
+          "#663500",
+          "#8f4a00",
+          "#b86b14",
+          "#d4954a",
+          "#e8bb85",
+          "#ffecc9",
+          "#fff6e3"
+        ]
+      }
     },
     "typographyMeta": {
-      "h1": { "displayName": "Page Title", "purpose": "One per page, 800 weight; 23px on phones." },
-      "h2": { "displayName": "Section Title", "purpose": "Panels and dialog heads." },
-      "h3": { "displayName": "Item Title", "purpose": "Cards and group heads." },
-      "body": { "displayName": "Body", "purpose": "Default 15px reading text." },
-      "label": { "displayName": "Control Label", "purpose": "Buttons and pills." },
+      "h1": {
+        "displayName": "Page Title",
+        "purpose": "One per page, 800 weight; 23px on phones."
+      },
+      "h2": {
+        "displayName": "Section Title",
+        "purpose": "Panels and dialog heads."
+      },
+      "h3": {
+        "displayName": "Item Title",
+        "purpose": "Cards and group heads."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default 15px reading text."
+      },
+      "label": {
+        "displayName": "Control Label",
+        "purpose": "Buttons and pills."
+      },
       "caption": { "displayName": "Caption", "purpose": "Hints, meta, chips." },
-      "price": { "displayName": "Price", "purpose": "Every money figure, tabular numerals." },
-      "landing-display": { "displayName": "Landing Display", "purpose": "Hero statement only, second line yellow." },
-      "price-tag-numeral": { "displayName": "Price-Tag Numeral", "purpose": "Landing tag object, cents raised at 24px." }
+      "price": {
+        "displayName": "Price",
+        "purpose": "Every money figure, tabular numerals."
+      },
+      "landing-display": {
+        "displayName": "Landing Display",
+        "purpose": "Hero statement only, second line yellow."
+      },
+      "price-tag-numeral": {
+        "displayName": "Price-Tag Numeral",
+        "purpose": "Landing tag object, cents raised at 24px."
+      }
     },
     "shadows": [
-      { "name": "shadow-1", "value": "0 1px 2px rgba(17,26,36,0.08), 0 2px 8px rgba(17,26,36,0.06)", "purpose": "Cards and landing fragments at rest." },
-      { "name": "shadow-2", "value": "0 4px 12px rgba(17,26,36,0.12), 0 16px 40px rgba(17,26,36,0.14)", "purpose": "Menus, dialogs, card hover." },
-      { "name": "hero-object", "value": "0 2px 4px rgba(0,0,0,0.18), 0 22px 44px rgba(0,0,0,0.3)", "purpose": "Landing price tag only." }
+      {
+        "name": "shadow-1",
+        "value": "0 1px 2px rgba(17,26,36,0.08), 0 2px 8px rgba(17,26,36,0.06)",
+        "purpose": "Cards and landing fragments at rest."
+      },
+      {
+        "name": "shadow-2",
+        "value": "0 4px 12px rgba(17,26,36,0.12), 0 16px 40px rgba(17,26,36,0.14)",
+        "purpose": "Menus, dialogs, card hover."
+      },
+      {
+        "name": "hero-object",
+        "value": "0 2px 4px rgba(0,0,0,0.18), 0 22px 44px rgba(0,0,0,0.3)",
+        "purpose": "Landing price tag only."
+      }
     ],
     "motion": [
-      { "name": "ease", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "All state transitions: 0.15s colour, 0.1s press." },
-      { "name": "settle-arrive", "value": "0.9s settle, 0.7s arrive after 0.55s", "purpose": "Landing tag and notification entrance; disabled under prefers-reduced-motion." }
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "All state transitions: 0.15s colour, 0.1s press."
+      },
+      {
+        "name": "settle-arrive",
+        "value": "0.9s settle, 0.7s arrive after 0.55s",
+        "purpose": "Landing tag and notification entrance; disabled under prefers-reduced-motion."
+      }
     ],
     "breakpoints": [
       { "name": "phone", "value": "720px" },
@@ -116,12 +272,36 @@
       "Status always carries text, never colour alone."
     ],
     "rules": [
-      { "name": "The One Action Rule", "body": "Yellow marks the single most important action or signal on a surface; blue is identity and default buttons.", "section": "colors" },
-      { "name": "The Text-On-Yellow Rule", "body": "Text on yellow is always fg ink, never white.", "section": "colors" },
-      { "name": "The Status Pair Rule", "body": "Status colour text sits on its -bg tint and is accompanied by words or an icon.", "section": "colors" },
-      { "name": "The Tabular Rule", "body": "Prices, quantities, durations and table cells use tabular numerals.", "section": "typography" },
-      { "name": "The Weight-Not-Face Rule", "body": "Hierarchy comes from weight and size inside Noto Sans; no second display face.", "section": "typography" },
-      { "name": "The Real Offset Rule", "body": "Shadows have blur and a real offset and soften; no hard zero-blur offsets.", "section": "elevation" }
+      {
+        "name": "The One Action Rule",
+        "body": "Yellow marks the single most important action or signal on a surface; blue is identity and default buttons.",
+        "section": "colors"
+      },
+      {
+        "name": "The Text-On-Yellow Rule",
+        "body": "Text on yellow is always fg ink, never white.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Pair Rule",
+        "body": "Status colour text sits on its -bg tint and is accompanied by words or an icon.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Prices, quantities, durations and table cells use tabular numerals.",
+        "section": "typography"
+      },
+      {
+        "name": "The Weight-Not-Face Rule",
+        "body": "Hierarchy comes from weight and size inside Noto Sans; no second display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Real Offset Rule",
+        "body": "Shadows have blur and a real offset and soften; no hard zero-blur offsets.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do use var(--*) tokens; the dark theme works only through them.",

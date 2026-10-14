@@ -1,4 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "./db.ts";
 
 export type StatFormat = "int" | "eur";
 
@@ -22,7 +22,7 @@ export type CounterKey =
   | "trip_checks"
   | "notifications_sent";
 
-export function ensureStatsSchema(db: DatabaseSync): void {
+export function ensureStatsSchema(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS stat_daily (
       day TEXT NOT NULL,
@@ -33,7 +33,7 @@ export function ensureStatsSchema(db: DatabaseSync): void {
   `);
 }
 
-export function bump(db: DatabaseSync, key: CounterKey, by = 1): void {
+export function bump(db: Db, key: CounterKey, by = 1): void {
   try {
     db.prepare(
       `INSERT INTO stat_daily (day, key, n) VALUES (?, ?, ?)
@@ -44,19 +44,19 @@ export function bump(db: DatabaseSync, key: CounterKey, by = 1): void {
   }
 }
 
-const counter = (db: DatabaseSync, key: CounterKey): number => {
+const counter = (db: Db, key: CounterKey): number => {
   const row = db
     .prepare("SELECT COALESCE(SUM(n), 0) AS n FROM stat_daily WHERE key = ?")
     .get(key) as { n: number };
   return row.n;
 };
 
-const scalar = (db: DatabaseSync, sql: string, ...args: number[]): number => {
+const scalar = (db: Db, sql: string, ...args: number[]): number => {
   const row = db.prepare(sql).get(...args) as { n: number | null } | undefined;
   return row?.n ?? 0;
 };
 
-export function computeStats(db: DatabaseSync, now = Date.now()): Stat[] {
+export function computeStats(db: Db, now = Date.now()): Stat[] {
   const s = (
     key: string,
     group: string,
@@ -199,7 +199,7 @@ export function computeStats(db: DatabaseSync, now = Date.now()): Stat[] {
   ];
 }
 
-export function getPublicStatsConfig(db: DatabaseSync): PublicStatsConfig {
+export function getPublicStatsConfig(db: Db): PublicStatsConfig {
   const row = db
     .prepare("SELECT value FROM settings WHERE key = 'publicStats'")
     .get() as { value: string } | undefined;
@@ -217,7 +217,7 @@ export function getPublicStatsConfig(db: DatabaseSync): PublicStatsConfig {
 }
 
 export function savePublicStatsConfig(
-  db: DatabaseSync,
+  db: Db,
   input: PublicStatsConfig,
 ): PublicStatsConfig {
   const known = new Set(computeStats(db).map((x) => x.key));
@@ -233,7 +233,7 @@ export function savePublicStatsConfig(
 }
 
 /** What the landing page may show: only chosen stats, and only those that have something to say. */
-export function publicStats(db: DatabaseSync): Stat[] {
+export function publicStats(db: Db): Stat[] {
   const cfg = getPublicStatsConfig(db);
   if (!cfg.enabled) return [];
   const chosen = new Set(cfg.keys);

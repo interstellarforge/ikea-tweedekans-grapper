@@ -1,5 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
-
+import type { Db } from "./db.ts";
 import { markPurchased } from "./watchlist.ts";
 
 export type ListProduct = {
@@ -58,7 +57,7 @@ export type ListView = {
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 export function createList(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   name: string,
   now: number,
@@ -69,11 +68,7 @@ export function createList(
   return Number(res.lastInsertRowid);
 }
 
-export function ownsList(
-  db: DatabaseSync,
-  userId: number,
-  listId: number,
-): boolean {
+export function ownsList(db: Db, userId: number, listId: number): boolean {
   return (
     db
       .prepare("SELECT 1 FROM lists WHERE id = ? AND user_id = ?")
@@ -81,11 +76,7 @@ export function ownsList(
   );
 }
 
-export function ownsItem(
-  db: DatabaseSync,
-  userId: number,
-  itemId: number,
-): boolean {
+export function ownsItem(db: Db, userId: number, itemId: number): boolean {
   return (
     db
       .prepare(
@@ -97,7 +88,7 @@ export function ownsItem(
 }
 
 export function ownsPurchase(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   purchaseId: number,
 ): boolean {
@@ -113,14 +104,14 @@ export function ownsPurchase(
   );
 }
 
-export function renameList(db: DatabaseSync, id: number, name: string): void {
+export function renameList(db: Db, id: number, name: string): void {
   db.prepare("UPDATE lists SET name = ? WHERE id = ?").run(
     name.trim().slice(0, 60) || "Lijst",
     id,
   );
 }
 
-export function deleteList(db: DatabaseSync, id: number): void {
+export function deleteList(db: Db, id: number): void {
   db.exec("BEGIN");
   try {
     db.prepare(
@@ -136,7 +127,7 @@ export function deleteList(db: DatabaseSync, id: number): void {
 }
 
 export function findListItem(
-  db: DatabaseSync,
+  db: Db,
   listId: number,
   articleNumber: string,
 ): { id: number; quantity: number } | undefined {
@@ -149,7 +140,7 @@ export function findListItem(
 
 /** Adds a product to a list; an existing item gets the larger quantity ("max") or is increased ("add"). */
 export function addListItem(
-  db: DatabaseSync,
+  db: Db,
   listId: number,
   product: ListProduct,
   quantity: number,
@@ -189,7 +180,7 @@ export function addListItem(
 }
 
 export function setItemQuantity(
-  db: DatabaseSync,
+  db: Db,
   itemId: number,
   quantity: number,
 ): void {
@@ -199,12 +190,12 @@ export function setItemQuantity(
   );
 }
 
-export function removeListItem(db: DatabaseSync, itemId: number): void {
+export function removeListItem(db: Db, itemId: number): void {
   db.prepare("DELETE FROM purchases WHERE list_item_id = ?").run(itemId);
   db.prepare("DELETE FROM list_items WHERE id = ?").run(itemId);
 }
 
-function remainingOf(db: DatabaseSync, itemId: number): number {
+function remainingOf(db: Db, itemId: number): number {
   const row = db
     .prepare(
       `SELECT li.quantity - COALESCE((SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0) AS remaining
@@ -216,7 +207,7 @@ function remainingOf(db: DatabaseSync, itemId: number): number {
 
 /** Records bought pieces, one price per piece. Never more than what is still needed. Returns the count. */
 export function recordPieces(
-  db: DatabaseSync,
+  db: Db,
   itemId: number,
   unitPrices: (number | undefined)[],
   storeName: string | undefined,
@@ -239,7 +230,7 @@ export function recordPieces(
   return pieces.length;
 }
 
-export function undoPurchase(db: DatabaseSync, purchaseId: number): void {
+export function undoPurchase(db: Db, purchaseId: number): void {
   db.prepare("DELETE FROM purchases WHERE id = ?").run(purchaseId);
 }
 
@@ -248,7 +239,7 @@ export function undoPurchase(db: DatabaseSync, purchaseId: number): void {
  * whatever is left goes to the manual quantity of the watchlist item.
  */
 export function purchaseByArticle(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   items: {
     articleNumber: string;
@@ -285,7 +276,7 @@ export function purchaseByArticle(
 }
 
 export function setItemWatched(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   itemId: number,
   watched: boolean,
@@ -328,7 +319,7 @@ export function setItemWatched(
 }
 
 export function setListWatched(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   listId: number,
   watched: boolean,
@@ -354,7 +345,7 @@ type ItemRow = {
 };
 
 export function getLists(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   countries: string[],
 ): ListView[] {

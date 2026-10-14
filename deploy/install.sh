@@ -70,6 +70,7 @@ else
 fi
 export PATH="$(dirname "$NODE_BIN"):$PATH"
 command -v npm >/dev/null || die "npm ontbreekt"
+command -v npx >/dev/null || die "npx ontbreekt"
 echo "==> Node.js: $NODE_BIN ($("$NODE_BIN" -v))"
 
 mkdir -p "$APP_DIR" "$DATA_DIR"
@@ -107,10 +108,17 @@ backup_database() {
 }
 backup_database
 
+echo "==> App bouwen (Next.js)"
+PNPM="npx --yes pnpm@10.33.0"
+(cd "$SRC_DIR" && $PNPM install --frozen-lockfile --silent && $PNPM exec next build)
+
 echo "==> App kopiëren naar $APP_DIR"
-rm -rf "$APP_DIR/src"
-cp -R "$SRC_DIR/src" "$SRC_DIR/package.json" "$APP_DIR/"
-(cd "$APP_DIR" && npm install --omit=dev --no-audit --no-fund --silent)
+mkdir -p "$APP_DIR"
+rm -rf "$APP_DIR/.next" "$APP_DIR/public" "$APP_DIR/server.js" "$APP_DIR/node_modules" "$APP_DIR/src"
+cp -R "$SRC_DIR/.next/standalone/." "$APP_DIR/"
+mkdir -p "$APP_DIR/.next"
+cp -R "$SRC_DIR/.next/static" "$APP_DIR/.next/static"
+cp -R "$SRC_DIR/public" "$APP_DIR/public"
 
 if [[ $SKIP_SYSTEM != 1 ]]; then
   id "$SERVICE_USER" >/dev/null 2>&1 \
@@ -152,7 +160,9 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
-ExecStart=$NODE_BIN src/main.ts
+Environment=NODE_ENV=production
+Environment=HOSTNAME=0.0.0.0
+ExecStart=$NODE_BIN server.js
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=true

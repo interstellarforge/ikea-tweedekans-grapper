@@ -3,27 +3,28 @@
 LAN webpage + service: follow Tweedekanshoek offers in chosen stores, search them, see what's new.
 
 - Data: IKEA's public as-is API (`web-api.ikea.com/circular/circular-asis`), polled for all stores of the enabled countries (NL on by default; BE and DE optional in `/settings`).
-- Stack: Node >=22.18 (native TS + `node:sqlite`), no runtime deps. DB: `data/tweedekans.db`.
+- Stack: Next.js 16 (App Router) + React 19, TypeScript, SQLite via better-sqlite3 (`data/tweedekans.db`, zelfde bestand en schema als voorheen), nodemailer. De JSON-API onder `/api/*` is de interface voor web en een latere mobiele app. De achtergrond-fetcher start via `src/instrumentation.ts`.
 
 ## Run
 
     pnpm install
-    pnpm start        # http://<host>:8080
+    pnpm dev          # http://localhost:3000 (ontwikkeling)
+    pnpm build && pnpm start   # productie op PORT (standaard 3000)
 
-Env: `PORT` (8080), `HOST`, `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen, bijv. `https://tweedekanshoek.nl`), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
+Env: `PORT`, `HOSTNAME` (Next), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen, bijv. `https://tweedekanshoek.nl`), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
 
 ## Linux service (systemd)
 
     sudo ./deploy/install.sh
 
-Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, installeert de dependency, maakt gebruiker `ikea`,
+Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, bouwt de app (`next build`, standalone), maakt gebruiker `ikea`,
 `/etc/ikea-tweedekans.env` (met gegenereerd wachtwoord en sleutel), de systemd-unit, en start de service.
 Opnieuw uitvoeren = updaten (config en data blijven). Voor elke update wordt een consistente back-up van de database gemaakt in `<datamap>/backups/` (de laatste 10 blijven bewaard). Terugzetten: `sudo ./deploy/restore-backup.sh --list` en daarna `sudo ./deploy/restore-backup.sh [bestand]` (zonder bestand: de nieuwste). De huidige database wordt eerst veiliggesteld, dus een herstel is terug te draaien. Verwijderen: `sudo ./deploy/install.sh --uninstall`.
 Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.js 24 (checksum-geverifieerd) in `/opt/ikea-tweedekans-node`, zonder de systeem-Node aan te passen (nodig: curl, tar, xz). Logs: `journalctl -u ikea-tweedekans -f`.
 
 ## Pages
 
-Publiek: `/` (landingspagina; ingelogd → `/watchlist`), `/login`, `/register`, `/healthz`. Ontwerp: IKEA-blauw/geel, Noto Sans (zelf gehost, OFL, `src/ui/fonts`), één stylesheet `src/ui/app.css`. Plain HTML/CSS/JS, geen framework.
+Publiek: `/` (landingspagina; ingelogd → `/watchlist`), `/login`, `/register`, `/healthz`. Ontwerp: IKEA-blauw/geel, Noto Sans (zelf gehost, OFL, `public/fonts`), één designsysteem in `src/app/globals.css` (tokens, zie DESIGN.md) plus kleine feature-stylesheets.
 
 `/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (menu: Aanbod; zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/admin` (beheer: statistieken [ook selecteerbaar voor de landingspagina], gebruikers, meldingstypes, ophalen & status), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
 

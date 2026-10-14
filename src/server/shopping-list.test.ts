@@ -11,6 +11,7 @@ test("parses pasted shopping lists", () => {
     "802 045 62",
     "geen artikelnummer hier",
   ].join("\n");
+
   expect(parseShoppingList(text)).toEqual([
     { articleNumber: "80204562", quantity: 3 }, // 2x + 1 (duplicate summed)
     { articleNumber: "90591705", quantity: 3 },

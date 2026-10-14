@@ -1,5 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
-
+import type { Db } from "./db.ts";
 import { type Ctx, listStores } from "./db.ts";
 import { getUserSettings } from "./settings.ts";
 import { STORE_COORDS } from "./store-coords.ts";
@@ -448,7 +447,7 @@ const estimateLeg = (
 };
 
 async function geocodePostcode(
-  db: DatabaseSync,
+  db: Db,
   postcode: string,
 ): Promise<{ lat: number; lon: number }> {
   const cached = db
@@ -476,7 +475,7 @@ type Source = "route" | "estimate";
 
 /** One-way driving leg home -> store via OSRM; falls back to an estimate. Cached per postcode+store. */
 async function homeLeg(
-  db: DatabaseSync,
+  db: Db,
   postcode: string,
   home: { lat: number; lon: number },
   storeId: string,
@@ -571,10 +570,7 @@ export type TripsResponse =
     };
 
 /** Driving legs between stores (directed), via one OSRM table request; cached. */
-async function ensureStoreDistances(
-  db: DatabaseSync,
-  storeIds: string[],
-): Promise<void> {
+async function ensureStoreDistances(db: Db, storeIds: string[]): Promise<void> {
   const known = new Set(
     (
       db
@@ -642,7 +638,7 @@ async function ensureStoreDistances(
   });
 }
 
-function storeLeg(db: DatabaseSync, from: string, to: string): Leg {
+function storeLeg(db: Db, from: string, to: string): Leg {
   if (from === to) return { km: 0, minutes: 0 };
   const row = db
     .prepare(
@@ -655,7 +651,7 @@ function storeLeg(db: DatabaseSync, from: string, to: string): Leg {
 }
 
 export async function computeTrips(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
 ): Promise<TripsResponse> {
   const settings = getUserSettings(db, userId);

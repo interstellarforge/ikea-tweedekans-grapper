@@ -38,6 +38,7 @@ test("accounts: first one is admin, login works, emails are unique and case-inse
     email: "kees@example.nl",
     password: "password-2",
   });
+
   expect(first.role).toBe("admin");
   expect(second.role).toBe("user");
   expect(first.email).toBe("admin@example.nl");
@@ -52,6 +53,7 @@ test("accounts: first one is admin, login works, emails are unique and case-inse
   ).toThrow();
 
   setPassword(db, second.id, "new-password-9");
+
   expect(checkLogin(db, "kees@example.nl", "password-2")).toBeUndefined();
   expect(checkLogin(db, "kees@example.nl", "new-password-9")?.id).toBe(
     second.id,
@@ -73,6 +75,7 @@ test("the last active admin cannot be demoted, deactivated or deleted", () => {
     email: "b@example.nl",
     password: "password-2",
   });
+
   expect(updateUser(db, admin.id, { role: "user" })).toMatch(/beheerder/);
   expect(updateUser(db, admin.id, { active: false })).toMatch(/beheerder/);
   expect(deleteUser(db, admin.id)).toMatch(/beheerder/);
@@ -142,6 +145,7 @@ test("single-user data is adopted by the first account", () => {
       email: "kees@example.nl",
       password: "password-1",
     });
+
     expect(admin.role).toBe("admin");
     expect(
       listWatchItems(db, admin.id, ["nl"]).map((w) => w.articleNumber),
@@ -153,7 +157,9 @@ test("single-user data is adopted by the first account", () => {
       email: "other@example.nl",
       password: "password-2",
     });
+
     expect(listWatchItems(db, other.id, ["nl"])).toHaveLength(0);
+
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

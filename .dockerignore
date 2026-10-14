@@ -1,7 +1,5 @@
 node_modules
-data
-deploy
+.next
 .git
+data
 .env
-*.md
-tsconfig.tsbuildinfo

@@ -1,0 +1,6 @@
+.alerts-page .table-wrap {
+  overflow-x: auto;
+}
+.alerts-page tr.unseen td:first-child {
+  border-left: 3px solid var(--accent);
+}

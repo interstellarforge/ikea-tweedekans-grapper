@@ -14,6 +14,7 @@ import {
 
 test("smtp password (admin) is encrypted, kept on empty update and never exposed", () => {
   const db = openDb(":memory:");
+
   expect(
     saveGlobalSettings(db, {
       smtp: {
@@ -29,11 +30,13 @@ test("smtp password (admin) is encrypted, kept on empty update and never exposed
   expect(getGlobalSettings(db).smtp.password).toBe("abcdefgh");
   expect(saveGlobalSettings(db, { smtp: { password: "" } })).toBeUndefined();
   expect(getGlobalSettings(db).smtp.password).toBe("abcdefgh");
+
   const raw = db
     .prepare("SELECT value FROM settings WHERE key = 'email.password'")
     .get() as {
     value: string;
   };
+
   expect(raw.value).not.toContain("abcdefgh");
   expect(toPublicGlobal(getGlobalSettings(db)).smtp).not.toHaveProperty(
     "password",
@@ -44,24 +47,30 @@ test("smtp password (admin) is encrypted, kept on empty update and never exposed
 
 test("admin controls which notification types exist", () => {
   const db = openDb(":memory:");
+
   expect(getGlobalSettings(db).channels).toEqual({
     ntfy: true,
     email: true,
     homeAssistant: true,
   });
+
   saveGlobalSettings(db, { channels: { email: false } });
+
   expect(getGlobalSettings(db).channels).toEqual({
     ntfy: true,
     email: false,
     homeAssistant: true,
   });
   expect(getGlobalSettings(db).registrationOpen).toBe(true);
+
   saveGlobalSettings(db, { registrationOpen: false });
+
   expect(getGlobalSettings(db).registrationOpen).toBe(false);
 });
 
 test("user settings are validated, per user, and secrets are not exposed", () => {
   const db = openDb(":memory:");
+
   expect(getUserSettings(db, 1)).toMatchObject({
     countries: ["nl"],
     fuelPrice: 2.1,
@@ -100,17 +109,21 @@ test("user settings are validated, per user, and secrets are not exposed", () =>
       },
     }),
   ).toBeUndefined();
+
   const s = getUserSettings(db, 1);
+
   expect(s.homeAssistant).toMatchObject({
     baseUrl: "http://ha.local:8123",
     token: "tok",
   });
   expect(s.notify.homeAssistant).toBe(true);
+
   const raw = db
     .prepare(
       "SELECT value FROM user_settings WHERE user_id = 1 AND key = 'ha.token'",
     )
     .get() as { value: string };
+
   expect(raw.value).not.toContain("tok");
   expect(toPublicUser(s).homeAssistant).not.toHaveProperty("token");
   expect(

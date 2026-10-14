@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
 
 import { hashPassword, verifyPassword } from "./auth.ts";
+import type { Db } from "./db.ts";
 
 export type Role = "user" | "admin";
 
@@ -44,19 +44,19 @@ export const normalizeEmail = (email: string): string =>
 export const isValidEmail = (email: string): boolean =>
   email.length <= 200 && EMAIL_RE.test(email);
 
-export function countUsers(db: DatabaseSync): number {
+export function countUsers(db: Db): number {
   return (db.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number })
     .n;
 }
 
-export function getUserById(db: DatabaseSync, id: number): User | undefined {
+export function getUserById(db: Db, id: number): User | undefined {
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
     UserRow | undefined;
   return row && toUser(row);
 }
 
 export function getUserByEmail(
-  db: DatabaseSync,
+  db: Db,
   email: string,
 ): (User & { passwordHash: string }) | undefined {
   const row = db
@@ -67,24 +67,21 @@ export function getUserByEmail(
 }
 
 /** Password hash of a user, used to bind sessions to the current password. */
-export function getPasswordHash(
-  db: DatabaseSync,
-  id: number,
-): string | undefined {
+export function getPasswordHash(db: Db, id: number): string | undefined {
   const row = db
     .prepare("SELECT password_hash FROM users WHERE id = ?")
     .get(id) as { password_hash: string } | undefined;
   return row?.password_hash;
 }
 
-export function listUsers(db: DatabaseSync): User[] {
+export function listUsers(db: Db): User[] {
   return (
     db.prepare("SELECT * FROM users ORDER BY created_at, id").all() as UserRow[]
   ).map(toUser);
 }
 
 /** Moves data created before multi-user support (user 0) to this user. */
-function adoptLegacyData(db: DatabaseSync, userId: number): void {
+function adoptLegacyData(db: Db, userId: number): void {
   for (const table of [
     "watch_items",
     "alerts",
@@ -97,7 +94,7 @@ function adoptLegacyData(db: DatabaseSync, userId: number): void {
 }
 
 export function createUser(
-  db: DatabaseSync,
+  db: Db,
   input: { email: string; password: string; role?: Role },
   now = Date.now(),
 ): User {
@@ -124,7 +121,7 @@ export function createUser(
 }
 
 export function checkLogin(
-  db: DatabaseSync,
+  db: Db,
   email: string,
   password: string,
 ): User | undefined {
@@ -146,22 +143,18 @@ export function checkLogin(
   };
 }
 
-export function touchLogin(db: DatabaseSync, id: number, now: number): void {
+export function touchLogin(db: Db, id: number, now: number): void {
   db.prepare("UPDATE users SET last_login = ? WHERE id = ?").run(now, id);
 }
 
-export function setPassword(
-  db: DatabaseSync,
-  id: number,
-  password: string,
-): void {
+export function setPassword(db: Db, id: number, password: string): void {
   db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
     hashPassword(password),
     id,
   );
 }
 
-function adminCount(db: DatabaseSync): number {
+function adminCount(db: Db): number {
   return (
     db
       .prepare(
@@ -173,7 +166,7 @@ function adminCount(db: DatabaseSync): number {
 
 /** Returns an error message when the change would leave the app without an active admin. */
 export function updateUser(
-  db: DatabaseSync,
+  db: Db,
   id: number,
   changes: { role?: Role; active?: boolean },
 ): string | undefined {
@@ -194,7 +187,7 @@ export function updateUser(
   return undefined;
 }
 
-export function deleteUser(db: DatabaseSync, id: number): string | undefined {
+export function deleteUser(db: Db, id: number): string | undefined {
   const user = getUserById(db, id);
   if (!user) return "Gebruiker niet gevonden";
   if (user.role === "admin" && user.active && adminCount(db) <= 1) {

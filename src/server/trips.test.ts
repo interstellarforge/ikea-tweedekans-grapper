@@ -27,6 +27,7 @@ test("trip is worth it when savings exceed fuel cost", () => {
     stopMinutes: 20,
     hourlyRate: 0,
   });
+
   expect(far).toMatchObject({
     tripCost: 28,
     saving: 35,
@@ -90,6 +91,7 @@ test("combined route never buys more than the wanted quantity", () => {
     homeLeg: (id) => ({ km: dist[id] ?? 999, minutes: 15 }),
     betweenLeg: () => ({ km: 5, minutes: 6 }),
   });
+
   // B alone: saves 25 + 50 = 75, cost 20 km x 0.1 = 2 -> net 73
   expect(bestSingle?.stops.map((s) => s.storeId)).toEqual(["B"]);
   expect(bestSingle?.net).toBe(73);
@@ -102,7 +104,9 @@ test("combined route never buys more than the wanted quantity", () => {
     stopMinutes: 40,
     totalMinutes: 76,
   });
+
   const units = best?.stops.flatMap((s) => s.units.map((u) => u.count)) ?? [];
+
   expect(units.reduce((a, b) => a + b, 0)).toBe(2); // exactly 1 + 1, no duplicates
 });
 
@@ -131,6 +135,7 @@ test("many stops use the heuristic order and still respect quantities", () => {
     wants,
     offers,
   });
+
   expect(best?.stops).toHaveLength(6);
   expect(best?.stopMinutes).toBe(60);
   expect(new Set(best?.stops.map((s) => s.storeId)).size).toBe(6);
@@ -157,6 +162,7 @@ test("profitable in money but not in time is flagged as time", () => {
   };
   // saving 35 - fuel 28 = +7; 140 min = 2h20 at EUR 10/h = 23.33 -> net -16.33
   const timed = evaluateTrip({ ...input, hourlyRate: 10 });
+
   expect(timed).toMatchObject({
     moneyNet: 7,
     timeCost: 23.33,
@@ -187,6 +193,7 @@ test("routes and trips longer than the maximum time are not offered", () => {
       },
     ],
   };
+
   // 2 x 60 + 20 = 140 minutes
   expect(evaluateTrip({ ...single, maxMinutes: 0 })).toMatchObject({
     tooLong: false,
@@ -219,9 +226,12 @@ test("routes and trips longer than the maximum time are not offered", () => {
     wants,
     offers,
   };
+
   // A + B: 15 + 10 + 15 driving + 40 in the stores = 80 minutes; a single store: 30 + 20 = 50
   expect(findBestRoute(base).best?.stops).toHaveLength(2);
+
   const limited = findBestRoute({ ...base, maxMinutes: 60 });
+
   expect(limited.best?.stops).toHaveLength(1);
   expect(limited.top.every((r) => r.totalMinutes <= 60)).toBe(true);
   expect(findBestRoute({ ...base, maxMinutes: 30 }).best).toBeUndefined();

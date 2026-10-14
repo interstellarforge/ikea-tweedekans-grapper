@@ -1,6 +1,5 @@
-import type { DatabaseSync } from "node:sqlite";
-
 import { COUNTRIES, COUNTRY_CODES, isCountry } from "./countries.ts";
+import type { Db } from "./db.ts";
 import {
   articleInsights,
   followersOf,
@@ -31,10 +30,7 @@ const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /** Fetches all offers of one store; raises alerts for the users that follow it and watch the article. */
-export async function pollStore(
-  db: DatabaseSync,
-  storeId: string,
-): Promise<number> {
+export async function pollStore(db: Db, storeId: string): Promise<number> {
   try {
     const store = listStores(db).find((st) => st.storeId === storeId);
     const country = store?.country ?? "nl";
@@ -88,7 +84,7 @@ export async function pollStore(
 const runState = { rerunRequested: false };
 const rerunWasRequested = (): boolean => runState.rerunRequested;
 
-async function pollOnce(db: DatabaseSync): Promise<void> {
+async function pollOnce(db: Db): Promise<void> {
   for (const country of COUNTRY_CODES) {
     try {
       upsertStores(db, await fetchStores(country), country);
@@ -113,7 +109,7 @@ async function pollOnce(db: DatabaseSync): Promise<void> {
  * Syncs every store of the enabled countries. When a run is already in progress this schedules
  * one more run right after it (settings such as the enabled countries may have changed).
  */
-export async function pollAll(db: DatabaseSync): Promise<void> {
+export async function pollAll(db: Db): Promise<void> {
   if (pollStatus.running) {
     runState.rerunRequested = true;
     return;
@@ -134,7 +130,7 @@ export async function pollAll(db: DatabaseSync): Promise<void> {
 }
 
 /** Runs pollAll repeatedly; the interval is re-read from settings after each run. */
-export function startPolling(db: DatabaseSync): () => void {
+export function startPolling(db: Db): () => void {
   let timer: NodeJS.Timeout | undefined;
   let stopped = false;
   const loop = () => {

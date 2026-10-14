@@ -1,0 +1,7 @@
+/* page-specific layout lives in the shared design system (app.css tokens) */
+.settings-page .field input[type="text"],
+.settings-page .field input[type="number"],
+.settings-page .field input[type="url"],
+.settings-page .field input[type="password"] {
+  max-width: 360px;
+}

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+
+import Database from "better-sqlite3";
 
 import type { IkeaOffer, Store } from "./ikea-client.ts";
 import { type PriceTag, priceTag } from "./insights.ts";
@@ -61,9 +62,11 @@ type OfferRow = {
 
 const PRUNE_AFTER_MS = 30 * 86_400_000;
 
-export function openDb(path: string): DatabaseSync {
+export type Db = Database.Database;
+
+export function openDb(path: string): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
+  const db = new Database(path);
   db.exec(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -238,7 +241,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** One-off: move the single-user shape (and its data) to per-user tables. Idempotent. */
-function migrateToMultiUser(db: DatabaseSync): void {
+function migrateToMultiUser(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -358,7 +361,7 @@ function migrateToMultiUser(db: DatabaseSync): void {
 }
 
 /** One-off: existing watchlist items become the first shopping list ("Boodschappenlijst"). */
-function migrateWatchItemsToList(db: DatabaseSync): void {
+function migrateWatchItemsToList(db: Db): void {
   const done = db
     .prepare("SELECT 1 FROM settings WHERE key = 'migrated.lists'")
     .get();
@@ -422,11 +425,7 @@ export type Ctx = { userId: number; countries: string[] };
 const placeholders = (n: number): string => Array(n).fill("?").join(",");
 
 /** Stores are global (fetched for everyone); per-user flags live in user_stores. */
-export function upsertStores(
-  db: DatabaseSync,
-  stores: Store[],
-  country = "nl",
-): void {
+export function upsertStores(db: Db, stores: Store[], country = "nl"): void {
   const stmt = db.prepare(
     `INSERT INTO stores (store_id, name, country, enabled) VALUES (?, ?, ?, 1)
      ON CONFLICT (store_id) DO UPDATE SET name = excluded.name, country = excluded.country, enabled = 1`,
@@ -438,7 +437,7 @@ export function upsertStores(
  * Stores with the user's own flags. Without a context all stores are returned (backend use).
  * Stores outside the NL start excluded from trips until the user opts in.
  */
-export function listStores(db: DatabaseSync, ctx?: Ctx): StoreRow[] {
+export function listStores(db: Db, ctx?: Ctx): StoreRow[] {
   const countries = ctx?.countries ?? [];
   const rows = db
     .prepare(
@@ -472,7 +471,7 @@ export function listStores(db: DatabaseSync, ctx?: Ctx): StoreRow[] {
 }
 
 function upsertUserStore(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   storeId: string,
   column: "followed" | "trip_excluded",
@@ -497,7 +496,7 @@ function upsertUserStore(
 }
 
 export function setFollowed(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   storeId: string,
   followed: boolean,
@@ -506,7 +505,7 @@ export function setFollowed(
 }
 
 export function setTripExcluded(
-  db: DatabaseSync,
+  db: Db,
   userId: number,
   storeId: string,
   excluded: boolean,
@@ -515,7 +514,7 @@ export function setTripExcluded(
 }
 
 /** Ids of the users that follow this store (alerts are raised per user). */
-export function followersOf(db: DatabaseSync, storeId: string): number[] {
+export function followersOf(db: Db, storeId: string): number[] {
   return (
     db
       .prepare(
@@ -529,7 +528,7 @@ export function followersOf(db: DatabaseSync, storeId: string): number[] {
 
 /** Upserts a store's current offers, records price history, deactivates vanished offers. Returns new offers. */
 export function syncStoreOffers(
-  db: DatabaseSync,
+  db: Db,
   storeId: string,
   offers: IkeaOffer[],
   now: number,
@@ -592,7 +591,7 @@ export function syncStoreOffers(
 }
 
 export function recordSyncError(
-  db: DatabaseSync,
+  db: Db,
   storeId: string,
   message: string,
 ): void {
@@ -636,7 +635,7 @@ const ORDER_BY: Record<NonNullable<OfferFilter["sort"]>, string> = {
 };
 
 export function searchOffers(
-  db: DatabaseSync,
+  db: Db,
   ctx: Ctx,
   filter: OfferFilter,
 ): { total: number; items: StoredOffer[] } {
@@ -697,7 +696,7 @@ export type ArticleInsight = {
 };
 
 export function articleInsights(
-  db: DatabaseSync,
+  db: Db,
   ctx: Ctx,
   articleNumbers: string[],
 ): Record<string, ArticleInsight> {
@@ -734,7 +733,7 @@ export type PricePoint = {
 };
 
 export function priceHistory(
-  db: DatabaseSync,
+  db: Db,
   articleNumber: string,
   limit = 200,
 ): PricePoint[] {
@@ -750,7 +749,7 @@ export function priceHistory(
 
 /** Basic product info from stored offers, for articles that the catalog search does not return. */
 export function offerProductInfo(
-  db: DatabaseSync,
+  db: Db,
   articleNumber: string,
 ):
   | { title: string; description: string; image: string | undefined }
