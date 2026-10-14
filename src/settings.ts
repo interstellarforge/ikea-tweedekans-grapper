@@ -45,6 +45,8 @@ export type Settings = {
   stopMinutes: number;
   /** Value of one hour of your time in EUR (0 = ignore time). */
   hourlyRate: number;
+  /** Longest trip you accept, in minutes (0 = no limit). */
+  maxTripMinutes: number;
   /** Routes may pass along all (non-excluded) stores; otherwise only followed stores. */
   routeAllStores: boolean;
   email: EmailSettings;
@@ -68,6 +70,7 @@ export type SettingsInput = {
   maxStops?: number;
   stopMinutes?: number;
   hourlyRate?: number;
+  maxTripMinutes?: number;
   routeAllStores?: boolean;
   email?: Partial<EmailSettings>;
   homeAssistant?: Partial<HomeAssistantSettings>;
@@ -84,6 +87,7 @@ const defaults = (): Settings => ({
   maxStops: 3,
   stopMinutes: 20,
   hourlyRate: 0,
+  maxTripMinutes: 0,
   routeAllStores: true,
   email: {
     enabled: false,
@@ -125,6 +129,10 @@ export function getSettings(db: DatabaseSync): Settings {
       map.has("hourlyRate") && Number(map.get("hourlyRate")) >= 0
         ? Number(map.get("hourlyRate"))
         : d.hourlyRate,
+    maxTripMinutes:
+      map.has("maxTripMinutes") && Number(map.get("maxTripMinutes")) >= 0
+        ? Number(map.get("maxTripMinutes"))
+        : d.maxTripMinutes,
     routeAllStores: map.has("routeAllStores")
       ? map.get("routeAllStores") === "1"
       : d.routeAllStores,
@@ -261,6 +269,12 @@ export function saveSettings(
       return "Uurtarief moet tussen 0 en 500 euro liggen";
     }
     writes.push(["hourlyRate", String(input.hourlyRate)]);
+  }
+  if (input.maxTripMinutes !== undefined) {
+    if (!(input.maxTripMinutes >= 0 && input.maxTripMinutes <= 1440)) {
+      return "Maximale tijd moet tussen 0 en 1440 minuten liggen (0 = geen limiet)";
+    }
+    writes.push(["maxTripMinutes", String(Math.round(input.maxTripMinutes))]);
   }
   if (input.routeAllStores !== undefined) {
     writes.push(["routeAllStores", input.routeAllStores ? "1" : "0"]);

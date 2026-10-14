@@ -51,6 +51,8 @@ const tripStatus = (
 
 export type TripResult = {
   items: TripItemResult[];
+  /** Takes longer than the maximum trip time from the settings. */
+  tooLong: boolean;
   roundTripKm: number;
   driveMinutes: number;
   /** Time spent inside the store (picking up). */
@@ -93,6 +95,8 @@ export function evaluateTrip(input: {
   oneWayMinutes: number;
   stopMinutes: number;
   hourlyRate: number;
+  /** Longest accepted trip in minutes (0 = no limit). */
+  maxMinutes?: number;
   fuelPrice: number;
   consumptionPer100km: number;
   items: TripItemInput[];
@@ -122,13 +126,18 @@ export function evaluateTrip(input: {
   const timeCost = round2((totalMinutes / 60) * input.hourlyRate);
   const moneyNet = round2(saving - tripCost);
   const net = round2(moneyNet - timeCost);
-  const status = tripStatus(
-    items.some((i) => i.found > 0),
-    moneyNet,
-    net,
-  );
+  const maxMinutes = input.maxMinutes ?? 0;
+  const tooLong = maxMinutes > 0 && totalMinutes > maxMinutes;
+  const status = tooLong
+    ? "bad"
+    : tripStatus(
+        items.some((i) => i.found > 0),
+        moneyNet,
+        net,
+      );
   return {
     items,
+    tooLong,
     roundTripKm,
     driveMinutes,
     stopMinutes: input.stopMinutes,
@@ -317,6 +326,8 @@ export function findBestRoute(input: {
   stopMinutes: number;
   /** Value of one hour of your time (EUR); 0 ignores time. */
   hourlyRate: number;
+  /** Routes taking longer than this many minutes are skipped (0 = no limit). */
+  maxMinutes?: number;
   homeLeg: (storeId: string) => Leg;
   betweenLeg: (from: string, to: string) => Leg;
   fuelPrice: number;
@@ -376,6 +387,7 @@ export function findBestRoute(input: {
         );
         const stopMinutes = order.length * input.stopMinutes;
         const totalMinutes = Math.round(minutes) + stopMinutes;
+        if (input.maxMinutes && totalMinutes > input.maxMinutes) continue;
         const timeCost = round2((totalMinutes / 60) * input.hourlyRate);
         const moneyNet = round2(saving - tripCost);
         const net = round2(moneyNet - timeCost);
@@ -545,6 +557,7 @@ export type TripsResponse =
       maxStops: number;
       stopMinutes: number;
       hourlyRate: number;
+      maxTripMinutes: number;
       routeAllStores: boolean;
       wantedUnits: number;
       stores: StoreTrip[];
@@ -716,6 +729,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
         oneWayMinutes: leg.minutes,
         stopMinutes: settings.stopMinutes,
         hourlyRate: settings.hourlyRate,
+        maxMinutes: settings.maxTripMinutes,
         fuelPrice: settings.fuelPrice,
         consumptionPer100km: settings.consumptionPer100km,
         items,
@@ -760,6 +774,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     maxStops: settings.maxStops,
     stopMinutes: settings.stopMinutes,
     hourlyRate: settings.hourlyRate,
+    maxMinutes: settings.maxTripMinutes,
     homeLeg: (id) => homeLegs.get(id) ?? unreachable,
     betweenLeg: (a, b) => storeLeg(db, a, b),
     fuelPrice: settings.fuelPrice,
@@ -817,6 +832,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     maxStops: settings.maxStops,
     stopMinutes: settings.stopMinutes,
     hourlyRate: settings.hourlyRate,
+    maxTripMinutes: settings.maxTripMinutes,
     routeAllStores: settings.routeAllStores,
     wantedUnits: watch.reduce((s, w) => s + w.quantity, 0),
     stores,

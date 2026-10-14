@@ -169,3 +169,60 @@ test("profitable in money but not in time is flagged as time", () => {
     evaluateTrip({ ...input, hourlyRate: 0, distanceKm: 500 }).status,
   ).toBe("bad");
 });
+
+test("routes and trips longer than the maximum time are not offered", () => {
+  const single = {
+    distanceKm: 100,
+    oneWayMinutes: 60,
+    stopMinutes: 20,
+    hourlyRate: 0,
+    fuelPrice: 2,
+    consumptionPer100km: 7,
+    items: [
+      {
+        articleNumber: "1",
+        name: "KALLAX",
+        quantity: 1,
+        offers: [{ price: 20, originalPrice: 400 }],
+      },
+    ],
+  };
+  // 2 x 60 + 20 = 140 minutes
+  expect(evaluateTrip({ ...single, maxMinutes: 0 })).toMatchObject({
+    tooLong: false,
+    status: "good",
+  });
+  expect(evaluateTrip({ ...single, maxMinutes: 140 }).tooLong).toBe(false);
+  expect(evaluateTrip({ ...single, maxMinutes: 139 })).toMatchObject({
+    tooLong: true,
+    status: "bad",
+    worthIt: false,
+  });
+
+  const offers = [
+    { storeId: "A", articleNumber: "1", price: 10, originalPrice: 100 },
+    { storeId: "B", articleNumber: "2", price: 10, originalPrice: 100 },
+  ];
+  const wants = [
+    { articleNumber: "1", name: "X", quantity: 1 },
+    { articleNumber: "2", name: "Y", quantity: 1 },
+  ];
+  const base = {
+    storeIds: ["A", "B"],
+    maxStops: 2,
+    stopMinutes: 20,
+    hourlyRate: 0,
+    homeLeg: () => ({ km: 10, minutes: 15 }),
+    betweenLeg: () => ({ km: 5, minutes: 10 }),
+    fuelPrice: 1,
+    consumptionPer100km: 10,
+    wants,
+    offers,
+  };
+  // A + B: 15 + 10 + 15 driving + 40 in the stores = 80 minutes; a single store: 30 + 20 = 50
+  expect(findBestRoute(base).best?.stops).toHaveLength(2);
+  const limited = findBestRoute({ ...base, maxMinutes: 60 });
+  expect(limited.best?.stops).toHaveLength(1);
+  expect(limited.top.every((r) => r.totalMinutes <= 60)).toBe(true);
+  expect(findBestRoute({ ...base, maxMinutes: 30 }).best).toBeUndefined();
+});

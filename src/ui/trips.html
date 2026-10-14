@@ -163,7 +163,9 @@
 
       const statusKind = (status) =>
         status === "good" ? "good" : status === "time" ? "warn" : "bad";
-      const statusLabel = (status) =>
+      const statusLabel = (status, tooLong = false) =>
+        tooLong ? "Langer dan je maximale tijd" : statusLabelBase(status);
+      const statusLabelBase = (status) =>
         status === "good"
           ? "Rendabel"
           : status === "time"
@@ -331,7 +333,7 @@
             "header",
             {},
             el("h3", { textContent: storeLabel(t) }),
-            chip(statusLabel(t.status), statusKind(t.status)),
+            chip(statusLabel(t.status, t.tooLong), statusKind(t.status)),
             el("span", {
               className: `net ${statusKind(t.status)}`,
               textContent: signed(t.net),
@@ -419,7 +421,15 @@
         // The best route is shown first; single stores only when it is not itself a single store.
         const alternatives = data.alternatives;
         $("routes").replaceChildren(
-          ...(data.bestRoute ? [bestPanel(data.bestRoute)] : []),
+          ...(data.bestRoute
+            ? [bestPanel(data.bestRoute)]
+            : data.maxTripMinutes > 0
+              ? [
+                  empty(
+                    `Geen route binnen ${duration(data.maxTripMinutes)} die iets oplevert.`,
+                  ),
+                ]
+              : []),
           ...(alternatives.length
             ? [
                 el("h2", {

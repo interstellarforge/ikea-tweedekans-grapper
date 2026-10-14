@@ -298,26 +298,37 @@
 
     <dialog id="buyDialog" class="modal">
       <div class="head">
-        <h2 id="buyTitle">Gekocht</h2>
+        <h2>Gekocht</h2>
         <button class="secondary" id="buyX" aria-label="Sluiten">✕</button>
       </div>
       <div class="body">
-        <div class="row">
-          <label for="buyCount">Hoeveel stuks heb je gekocht?</label>
-          <select id="buyCount"></select>
+        <div class="buy-product">
+          <img id="buyImg" alt="" />
+          <div>
+            <strong id="buyName"></strong>
+            <div class="meta" id="buyMeta"></div>
+          </div>
         </div>
-        <div class="pieces" id="buyPieces"></div>
-        <div class="row" style="margin-top: 14px">
+        <div class="field-row">
+          <label>Aantal gekocht</label>
+          <div class="stepper">
+            <button class="secondary" id="buyMinus" aria-label="Minder">
+              −
+            </button>
+            <strong id="buyCount">1</strong>
+            <button class="secondary" id="buyPlus" aria-label="Meer">+</button>
+          </div>
+        </div>
+        <div id="buyPieces"></div>
+        <div class="field-row">
           <label for="buyStore">Winkel</label>
-          <input
-            type="text"
-            id="buyStore"
-            list="buyStores"
-            placeholder="optioneel"
-          />
-          <datalist id="buyStores"></datalist>
+          <input type="text" id="buyStore" placeholder="optioneel" />
         </div>
         <p class="hint" id="buyHint"></p>
+        <div class="buy-total">
+          <span>Totaal</span>
+          <span id="buyTotal">€ 0,00</span>
+        </div>
       </div>
       <div class="foot">
         <span id="buyMsg" class="err"></span>
@@ -341,6 +352,8 @@
         empty,
         chip,
         countryTag,
+        confirmDialog,
+        promptDialog,
         iconButton,
         ikeaOfferUrl,
       } = App;
@@ -557,7 +570,11 @@
           textContent: "＋ Nieuwe lijst",
         });
         add.onclick = async () => {
-          const name = prompt("Naam van de nieuwe lijst (bijv. Keuken)");
+          const name = await promptDialog({
+            title: "Nieuwe lijst",
+            label: "Naam van de lijst (bijv. Keuken)",
+            confirmText: "Aanmaken",
+          });
           if (!name) return;
           const r = await send("/api/lists", "POST", { name });
           activeListId = r.id;
@@ -584,7 +601,7 @@
           it.estimateSource === "tweedekans"
             ? `tweedekans nu${it.bestOffer ? " · " + it.bestOffer.storeName + countryTag(it.bestOffer.country) : ""}`
             : "nieuwprijs";
-        return `${money(it.estimateUnit)} p/st · ${src}`;
+        return `~${money(it.estimateUnit)} p/st · ${src}`;
       };
 
       const lineRow = (it) => {
@@ -707,7 +724,10 @@
           el(
             "div",
             { className: "price" },
-            el("div", { className: "total", textContent: money(it.lineTotal) }),
+            el("div", {
+              className: "total",
+              textContent: `${it.remaining > 0 && it.estimateUnit !== undefined ? "~" : ""}${money(it.lineTotal)}`,
+            }),
             it.paid > 0
               ? el("small", {
                   textContent: `waarvan betaald ${money(it.paid)}`,
@@ -715,7 +735,7 @@
               : null,
             it.remaining > 0 && it.estimateUnit !== undefined
               ? el("small", {
-                  textContent: `${it.remaining} × ${money(it.estimateUnit)} geschat`,
+                  textContent: `${it.remaining} × ~${money(it.estimateUnit)}`,
                 })
               : null,
           ),
@@ -767,7 +787,11 @@
             },
           }),
           iconButton("edit", "Lijst hernoemen", async () => {
-            const name = prompt("Nieuwe naam", list.name);
+            const name = await promptDialog({
+              title: "Lijst hernoemen",
+              label: "Nieuwe naam",
+              value: list.name,
+            });
             if (!name) return;
             await send(`/api/lists/${list.id}`, "PUT", { name });
             loadLists();
@@ -776,10 +800,11 @@
             "trash",
             "Lijst verwijderen",
             async () => {
-              if (
-                !confirm(`Lijst "${list.name}" met alle aankopen verwijderen?`)
-              )
-                return;
+              const ok = await confirmDialog({
+                title: "Lijst verwijderen",
+                message: `Lijst "${list.name}" met alle items en aankopen verwijderen?`,
+              });
+              if (!ok) return;
               await send(`/api/lists/${list.id}`, "DELETE");
               loadLists();
               loadItems();
@@ -794,13 +819,15 @@
           el(
             "div",
             { className: "bon" },
-            kv("Totaal (geschat)", money(t.total)),
+            kv("Totaal", `${t.toBuy > 0 ? "~" : ""}${money(t.total)}`),
             kv("Al betaald", money(t.paid)),
-            kv("Nog te kopen", money(t.toBuy)),
+            kv("Nog te kopen", `${t.toBuy > 0 ? "~" : ""}${money(t.toBuy)}`),
             kv("Nieuwprijs", t.atNewPrice ? money(t.atNewPrice) : "–"),
             kv(
               "Bespaard",
-              t.atNewPrice ? money(t.saving) : "–",
+              t.atNewPrice
+                ? `${t.toBuy > 0 ? "~" : ""}${money(t.saving)}`
+                : "–",
               t.saving > 0 ? "good" : "",
             ),
           ),
@@ -851,43 +878,62 @@
       // ---- Gekocht-modal: prijs per stuk ----
       const buyDialog = $("buyDialog");
       let buyTarget = null;
+      let buyCount = 1;
+
+      const buyTotal = () => {
+        const sum = [...$("buyPieces").querySelectorAll("input")].reduce(
+          (n, i) => n + (Number(i.value) || 0),
+          0,
+        );
+        $("buyTotal").textContent = money(sum);
+      };
 
       function renderPieces() {
-        const n = Number($("buyCount").value);
-        const first = buyTarget.estimate;
         const previous = [...$("buyPieces").querySelectorAll("input")].map(
-          (i) => i.value,
+          (i) => ({ value: i.value, touched: i.dataset.touched }),
         );
+        const fallback =
+          buyTarget.estimate !== undefined ? String(buyTarget.estimate) : "";
+        $("buyCount").textContent = String(buyCount);
+        $("buyMinus").disabled = buyCount <= 1;
+        $("buyPlus").disabled = buyCount >= buyTarget.max;
         $("buyPieces").replaceChildren(
-          ...Array.from({ length: n }, (_, idx) => {
+          ...Array.from({ length: buyCount }, (_, idx) => {
             const input = el("input", {
               type: "number",
               min: 0,
               step: "0.01",
-              value:
-                previous[idx] ?? (first !== undefined ? String(first) : ""),
-              placeholder: "prijs",
-              style: "width: 130px",
+              value: previous[idx]?.value ?? fallback,
+              ariaLabel: `Prijs stuk ${idx + 1}`,
             });
-            if (idx === 0) {
-              input.oninput = () => {
+            if (previous[idx]?.touched) input.dataset.touched = "1";
+            input.oninput = () => {
+              input.dataset.touched = "1";
+              if (idx === 0) {
+                // The first price is the default for the pieces you did not edit yourself.
                 for (const other of [
                   ...$("buyPieces").querySelectorAll("input"),
                 ].slice(1)) {
                   if (!other.dataset.touched) other.value = input.value;
                 }
-              };
-            } else {
-              input.oninput = () => {
-                input.dataset.touched = "1";
-              };
-            }
-            return [
-              el("label", { textContent: `Stuk ${idx + 1} — € per stuk` }),
-              input,
-            ];
-          }).flat(),
+              }
+              buyTotal();
+            };
+            if (idx === 0) delete input.dataset.touched;
+            return el(
+              "div",
+              { className: "field-row" },
+              el("label", { textContent: `Stuk ${idx + 1}` }),
+              el(
+                "div",
+                { className: "money-input" },
+                el("span", { textContent: "€" }),
+                input,
+              ),
+            );
+          }),
         );
+        buyTotal();
       }
 
       /** target: a list item (inList=true) or a watchlist item (manual quantity). */
@@ -923,32 +969,32 @@
           item,
           estimate,
           articleNumber: item.articleNumber,
+          max: Math.max(1, Math.min(remaining, 50)),
         };
-        $("buyTitle").textContent =
-          `Gekocht: ${`${item.name} ${item.typeName}`.trim()}`;
-        $("buyCount").replaceChildren(
-          ...Array.from(
-            { length: Math.max(1, Math.min(remaining, 50)) },
-            (_, k) =>
-              el("option", {
-                value: String(k + 1),
-                textContent: String(k + 1),
-              }),
-          ),
-        );
-        $("buyCount").value = "1";
+        buyCount = 1;
+        $("buyImg").src = item.image || "";
+        $("buyName").textContent = `${item.name} ${item.typeName}`.trim();
+        $("buyMeta").textContent =
+          `art. ${item.articleNumber} · nog ${remaining} nodig`;
         $("buyPieces").replaceChildren();
         $("buyStore").value = best?.storeName ?? "";
         $("buyHint").textContent =
           estimate !== undefined
-            ? `Voorgesteld: ${money(estimate)} per stuk (${best ? "tweedekans nu" : "nieuwprijs"}). Pas de prijs aan als je minder of meer hebt betaald.`
+            ? `Voorgesteld: ${money(estimate)} per stuk (${best ? "tweedekans nu" : "nieuwprijs"}). Pas aan als je een andere prijs betaalde.`
             : "Vul de prijs per stuk in.";
         $("buyMsg").textContent = "";
         $("buySave").disabled = false;
         renderPieces();
         buyDialog.showModal();
       }
-      $("buyCount").onchange = renderPieces;
+      $("buyMinus").onclick = () => {
+        buyCount = Math.max(1, buyCount - 1);
+        renderPieces();
+      };
+      $("buyPlus").onclick = () => {
+        buyCount = Math.min(buyTarget.max, buyCount + 1);
+        renderPieces();
+      };
       $("buyX").onclick = () => buyDialog.close();
       $("buyCancel").onclick = () => buyDialog.close();
       $("buySave").onclick = async () => {

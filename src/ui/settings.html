@@ -538,6 +538,7 @@
           maxStops: Number($("maxStops").value),
           stopMinutes: Number($("stopMinutes").value),
           hourlyRate: Number($("hourlyRate").value),
+          maxTripMinutes: Number($("maxTripMinutes").value),
           routeAllStores: $("routeAll").checked,
           email: emailPayload(),
           homeAssistant: {
@@ -767,6 +768,7 @@
         $("maxStops").value = String(s.maxStops);
         $("stopMinutes").value = String(s.stopMinutes);
         $("hourlyRate").value = String(s.hourlyRate);
+        $("maxTripMinutes").value = String(s.maxTripMinutes);
         $("routeAll").checked = s.routeAllStores;
         $("maxStopsWarn").hidden = s.maxStops <= 4;
         const e = s.email;

@@ -72,15 +72,14 @@ const App = (() => {
   const chip = (text, kind = "") =>
     el("span", { className: `chip ${kind}`, textContent: text });
 
+  /** "€2,50" without the space, for compact chips. */
+  const moneyTight = (v, currency = "EUR") =>
+    money(v, currency).replace(/\s/g, "");
+
   const tagChip = (tag) => {
     if (!tag || tag.kind === "equal") return null;
-    if (tag.kind === "lowest") {
-      return chip(`Nieuwe laagste prijs (eerder ${money(tag.low)})`, "good");
-    }
-    return chip(
-      `+${money(tag.diff)} t.o.v. laagste (${money(tag.low)})`,
-      "bad",
-    );
+    if (tag.kind === "lowest") return chip("Laagste prijs", "good");
+    return chip(`+${moneyTight(tag.diff)}`, "bad");
   };
 
   /** Collapses identical offers (same store, price, tag) and puts followed stores first. */
@@ -218,6 +217,113 @@ const App = (() => {
     b.onclick = onclick;
     return b;
   };
+
+  /** Builds a modal dialog; returns { dlg, close }. Resolves nothing itself. */
+  const makeModal = (title, bodyNodes, footNodes) => {
+    const dlg = el("dialog", { className: "modal" });
+    const close = () => {
+      if (dlg.open) dlg.close();
+    };
+    dlg.append(
+      el(
+        "div",
+        { className: "head" },
+        el("h2", { textContent: title }),
+        el("button", {
+          className: "secondary",
+          textContent: "✕",
+          ariaLabel: "Sluiten",
+          onclick: close,
+        }),
+      ),
+      el("div", { className: "body" }, ...bodyNodes),
+      el("div", { className: "foot" }, ...footNodes),
+    );
+    dlg.addEventListener("close", () => dlg.remove());
+    document.body.append(dlg);
+    return { dlg, close };
+  };
+
+  /** Custom replacement for window.prompt. Resolves to the text, or undefined when cancelled. */
+  const promptDialog = ({
+    title,
+    label,
+    value = "",
+    confirmText = "Opslaan",
+    placeholder = "",
+  }) =>
+    new Promise((resolve) => {
+      const input = el("input", {
+        type: "text",
+        value,
+        placeholder,
+        style: "width: 100%",
+      });
+      let result;
+      const ok = el("button", { textContent: confirmText });
+      const cancel = el("button", {
+        className: "secondary",
+        textContent: "Annuleren",
+      });
+      const { dlg, close } = makeModal(
+        title,
+        [
+          el("label", {
+            textContent: label,
+            style: "display:block;margin-bottom:8px",
+          }),
+          input,
+        ],
+        [cancel, ok],
+      );
+      const submit = () => {
+        const v = input.value.trim();
+        if (!v) return input.focus();
+        result = v;
+        close();
+      };
+      ok.onclick = submit;
+      cancel.onclick = close;
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") submit();
+      };
+      dlg.addEventListener("close", () => resolve(result));
+      dlg.showModal();
+      input.focus();
+      input.select();
+    });
+
+  /** Custom replacement for window.confirm. */
+  const confirmDialog = ({
+    title,
+    message,
+    confirmText = "Verwijderen",
+    danger = true,
+  }) =>
+    new Promise((resolve) => {
+      let result = false;
+      const ok = el("button", {
+        textContent: confirmText,
+        className: danger ? "danger" : "",
+      });
+      const cancel = el("button", {
+        className: "secondary",
+        textContent: "Annuleren",
+      });
+      const { dlg, close } = makeModal(
+        title,
+        [el("p", { textContent: message, style: "margin:0" })],
+        [cancel, ok],
+      );
+      ok.onclick = () => {
+        result = true;
+        close();
+      };
+      cancel.onclick = close;
+      dlg.addEventListener("close", () => resolve(result));
+      dlg.showModal();
+      cancel.focus();
+    });
 
   /** Dialog to put a product on one of the shopping lists (or a new one). */
   const addToList = async (product) => {
@@ -471,6 +577,9 @@ const App = (() => {
     insightChips,
     ikeaOfferUrl,
     countryTag,
+    moneyTight,
+    promptDialog,
+    confirmDialog,
     icon,
     iconButton,
     addToList,

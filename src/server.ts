@@ -146,6 +146,34 @@ function send(
   return undefined;
 }
 
+let refreshingPrices = false;
+
+/** Fetches the regular price from IKEA's catalog for list items that have none yet (background). */
+function refreshListPrices(db: DatabaseSync): void {
+  if (refreshingPrices) return;
+  const missing = db
+    .prepare(
+      "SELECT DISTINCT article_number AS article FROM list_items WHERE normal_price IS NULL LIMIT 8",
+    )
+    .all() as { article: string }[];
+  if (missing.length === 0) return;
+  refreshingPrices = true;
+  void Promise.allSettled(
+    missing.map(async ({ article }) => {
+      const found = (await searchCatalog(article)).find(
+        (p) => p.articleNumber === article,
+      );
+      if (found?.price !== undefined) {
+        db.prepare(
+          "UPDATE list_items SET normal_price = ? WHERE article_number = ?",
+        ).run(found.price, article);
+      }
+    }),
+  ).finally(() => {
+    refreshingPrices = false;
+  });
+}
+
 export function createApp(db: DatabaseSync, auth: Auth): Server {
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -326,6 +354,9 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       }
       if (typeof body["maxStops"] === "number") {
         input.maxStops = body["maxStops"];
+      }
+      if (typeof body["maxTripMinutes"] === "number") {
+        input.maxTripMinutes = body["maxTripMinutes"];
       }
       if (typeof body["hourlyRate"] === "number") {
         input.hourlyRate = body["hourlyRate"];
@@ -599,6 +630,7 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
 
     if (method === "GET" && path === "/api/lists") {
       send(res, 200, getLists(db));
+      refreshListPrices(db);
       return;
     }
 
