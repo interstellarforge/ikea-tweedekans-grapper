@@ -1,0 +1,18 @@
+[Unit]
+Description=IKEA Tweedekans watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ikea-tweedekans-grapper
+ExecStart=/usr/bin/node src/main.ts
+Environment=PORT=8080
+Environment=POLL_INTERVAL_MIN=10
+Restart=on-failure
+RestartSec=10
+User=ikea
+DynamicUser=no
+
+[Install]
+WantedBy=multi-user.target

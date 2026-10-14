@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(160px, 280px) 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+      .hero img {
+        width: 100%;
+        border-radius: 10px;
+        background: var(--neutral-bg);
+      }
+      @media (max-width: 600px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="javascript:history.back()">← Terug</a></p>
+      <div id="content"><div class="empty">Laden…</div></div>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const {
+        $,
+        el,
+        api,
+        send,
+        money,
+        ago,
+        chip,
+        tagChip,
+        groupOffers,
+        initShell,
+        empty,
+      } = App;
+      initShell("");
+      const article = location.pathname.split("/").pop();
+      const date = (ms) =>
+        new Date(ms).toLocaleString("nl-NL", {
+          dateStyle: "short",
+          timeStyle: "short",
+        });
+
+      const th = (labels) =>
+        el(
+          "thead",
+          {},
+          el("tr", {}, ...labels.map((h) => el("th", { textContent: h }))),
+        );
+      const wrap = (table) => el("div", { className: "table-wrap" }, table);
+
+      const offerRows = (groups) =>
+        groups.map((g) =>
+          el(
+            "tr",
+            {},
+            el(
+              "td",
+              {},
+              el("strong", { textContent: g.storeName }),
+              g.count > 1
+                ? el("span", { className: "meta", textContent: ` ×${g.count}` })
+                : null,
+            ),
+            el(
+              "td",
+              {},
+              el("strong", { textContent: money(g.price, g.currency) }),
+            ),
+            el("td", {
+              textContent: g.originalPrice
+                ? money(g.originalPrice, g.currency)
+                : "–",
+            }),
+            el("td", {
+              textContent:
+                [g.condition, g.reason].filter(Boolean).join(" · ") || "–",
+            }),
+            el(
+              "td",
+              {},
+              tagChip(g.tag) ??
+                el("span", { className: "meta", textContent: "–" }),
+            ),
+            el("td", { textContent: ago(g.firstSeen) }),
+          ),
+        );
+
+      const offerSection = (title, groups, emptyText) =>
+        el(
+          "section",
+          { className: "panel" },
+          el("h2", { textContent: title }),
+          groups.length
+            ? wrap(
+                el(
+                  "table",
+                  {},
+                  th([
+                    "Filiaal",
+                    "Prijs",
+                    "Nieuwprijs",
+                    "Staat",
+                    "Prijs t.o.v. laagste",
+                    "Sinds",
+                  ]),
+                  el("tbody", {}, ...offerRows(groups)),
+                ),
+              )
+            : empty(emptyText),
+        );
+
+      async function render() {
+        let p;
+        try {
+          p = await api(`/api/product/${article}`);
+        } catch (e) {
+          $("content").replaceChildren(
+            empty(`Product niet gevonden (${e.message})`),
+          );
+          return;
+        }
+        document.title = `${p.name} ${p.typeName} · IKEA Tweedekans`;
+        const offers = p.insight?.offers ?? [];
+        const groups = groupOffers(offers);
+        const followed = groups.filter((g) => g.followed);
+        const others = groups.filter((g) => !g.followed);
+        const cheapest = [...offers].sort((a, b) => a.price - b.price)[0];
+
+        const follow = el("button", {
+          textContent: p.watched ? "Verwijder van watchlist" : "Volgen",
+          className: p.watched ? "secondary" : "",
+        });
+        follow.onclick = async () => {
+          follow.disabled = true;
+          if (p.watched)
+            await send(`/api/watchlist/${p.articleNumber}`, "DELETE");
+          else await send("/api/watchlist", "PUT", p);
+          render();
+        };
+
+        // One row per (filiaal, prijs, meting) instead of one per offer.
+        const hist = new Map();
+        for (const h of p.history) {
+          const key = `${h.storeId}|${h.price}|${h.measuredAt}`;
+          const e = hist.get(key);
+          if (e) e.count += 1;
+          else hist.set(key, { ...h, count: 1 });
+        }
+        const historyTable = hist.size
+          ? wrap(
+              el(
+                "table",
+                {},
+                th(["Gemeten", "Filiaal", "Prijs", "Aantal"]),
+                el(
+                  "tbody",
+                  {},
+                  ...[...hist.values()].map((h) =>
+                    el(
+                      "tr",
+                      {},
+                      el("td", { textContent: date(h.measuredAt) }),
+                      el("td", { textContent: h.storeName }),
+                      el("td", { textContent: money(h.price) }),
+                      el("td", { textContent: `×${h.count}` }),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : empty("Nog geen prijzen gemeten.");
+
+        $("content").replaceChildren(
+          el(
+            "div",
+            { className: "hero" },
+            el("img", { src: p.image || "", alt: "" }),
+            el(
+              "div",
+              {},
+              el("h1", { textContent: `${p.name} ${p.typeName}` }),
+              el("p", {
+                className: "lead",
+                textContent: `Artikelnummer ${p.articleNumber}${p.measure ? " · " + p.measure : ""}`,
+              }),
+              el(
+                "div",
+                { className: "chips", style: "margin-bottom:12px" },
+                chip(
+                  `${offers.length} in tweedekanshoek`,
+                  offers.length ? "info" : "",
+                ),
+                cheapest
+                  ? chip(
+                      `Laagste nu: ${money(cheapest.price, cheapest.currency)} in ${cheapest.storeName}`,
+                      "good",
+                    )
+                  : null,
+                p.insight?.lowestEver !== undefined
+                  ? chip(`Laagste ooit gemeten: ${money(p.insight.lowestEver)}`)
+                  : null,
+              ),
+              el(
+                "div",
+                { className: "row" },
+                follow,
+                p.url
+                  ? el("a", {
+                      href: p.url,
+                      target: "_blank",
+                      rel: "noopener",
+                      textContent: "Productpagina op IKEA.nl",
+                    })
+                  : null,
+                el("a", {
+                  href: "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/",
+                  target: "_blank",
+                  rel: "noopener",
+                  textContent: "Tweedekanshoek op IKEA.nl",
+                }),
+              ),
+            ),
+          ),
+          offerSection(
+            "★ Gevolgde filialen",
+            followed,
+            "Niet beschikbaar in een gevolgd filiaal.",
+          ),
+          offerSection(
+            "Overige filialen",
+            others,
+            "Niet beschikbaar in overige filialen.",
+          ),
+          el(
+            "section",
+            { className: "panel" },
+            el("h2", { textContent: "Prijsgeschiedenis" }),
+            historyTable,
+          ),
+        );
+      }
+      render();
+    </script>
+  </body>
+</html>

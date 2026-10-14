@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "@tsconfig/node22/tsconfig.json",
+    "@tsconfig/strictest/tsconfig.json"
+  ],
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src", "eslint.config.js"]
+}

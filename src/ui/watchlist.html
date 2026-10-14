@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Watchlist · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Watchlist</h1>
+      <p class="lead">
+        Producten die je in de gaten houdt. Je krijgt een melding zodra ze in de
+        tweedekanshoek van een gevolgd filiaal verschijnen.
+      </p>
+      <section class="panel" id="alertPanel" hidden>
+        <div class="row">
+          <h2 style="margin: 0">Meldingen</h2>
+          <button class="secondary" id="seen">Alles gezien</button>
+        </div>
+        <div id="alerts"></div>
+      </section>
+      <div class="grid" id="items"></div>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const {
+        $,
+        el,
+        api,
+        send,
+        money,
+        ago,
+        initShell,
+        insightChips,
+        empty,
+        chip,
+      } = App;
+      const refreshShell = initShell("watchlist");
+
+      async function loadAlerts() {
+        const unseen = (await api("/api/alerts")).filter((a) => !a.seen);
+        $("alertPanel").hidden = unseen.length === 0;
+        $("alerts").replaceChildren(
+          ...unseen.map((a) =>
+            el(
+              "div",
+              { className: "alert" },
+              el("strong", {
+                textContent: `${a.title} ligt in ${a.storeName} voor ${money(a.price)}!`,
+              }),
+              el("span", {
+                className: "meta",
+                textContent: `${a.description} · ${ago(a.createdAt)}`,
+              }),
+              el("a", {
+                href: "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/",
+                target: "_blank",
+                rel: "noopener",
+                textContent: "Naar tweedekanshoek",
+              }),
+            ),
+          ),
+        );
+      }
+
+      async function loadItems() {
+        const items = await api("/api/watchlist");
+        if (!items.length) {
+          $("items").replaceChildren(
+            empty(
+              'Nog niets op je watchlist. Zoek een product onder "Zoeken in producten".',
+            ),
+          );
+          return;
+        }
+        $("items").replaceChildren(
+          ...items.map((i) => {
+            const rm = el("button", {
+              className: "secondary",
+              textContent: "Verwijderen",
+            });
+            rm.onclick = async () => {
+              await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
+              loadItems();
+            };
+            const chips = insightChips(i.insight);
+            return el(
+              "div",
+              { className: "card" },
+              el(
+                "a",
+                { href: `/product/${i.articleNumber}` },
+                el("img", { src: i.image || "", loading: "lazy", alt: "" }),
+              ),
+              el(
+                "div",
+                { className: "body" },
+                el("a", {
+                  className: "title",
+                  href: `/product/${i.articleNumber}`,
+                  style: "color:inherit;text-decoration:none",
+                  textContent: `${i.name} ${i.typeName}`,
+                }),
+                el("div", {
+                  className: "meta",
+                  textContent: `art. ${i.articleNumber}${i.measure ? " · " + i.measure : ""}`,
+                }),
+                chips.length
+                  ? chips
+                  : el(
+                      "div",
+                      { className: "chips" },
+                      chip("Niet in tweedekanshoek"),
+                    ),
+                i.insight?.lowestEver !== undefined && i.insight.offers.length
+                  ? el("div", {
+                      className: "meta",
+                      textContent: `Laagste ooit gemeten: ${money(i.insight.lowestEver)}`,
+                    })
+                  : null,
+                el("div", { className: "spacer" }),
+                rm,
+              ),
+            );
+          }),
+        );
+      }
+
+      $("seen").onclick = async () => {
+        await send("/api/alerts/seen", "POST");
+        loadAlerts();
+        refreshShell();
+      };
+      loadAlerts();
+      loadItems();
+      setInterval(() => {
+        loadAlerts();
+        loadItems();
+      }, 60000);
+    </script>
+  </body>
+</html>

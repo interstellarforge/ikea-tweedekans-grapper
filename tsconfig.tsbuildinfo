@@ -1,0 +1,1 @@
+{"root":["./src/config.ts","./src/db.test.ts","./src/db.ts","./src/ikea-client.ts","./src/insights.test.ts","./src/insights.ts","./src/main.ts","./src/notify.ts","./src/poller.ts","./src/secrets.ts","./src/server.ts","./src/settings.test.ts","./src/settings.ts","./src/watchlist.ts"],"version":"5.9.3"}

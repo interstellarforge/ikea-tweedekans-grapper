@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Instellingen · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .field {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 8px 12px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .field input[type="text"],
+      .field input[type="url"],
+      .field input[type="number"],
+      .field input[type="password"],
+      .field select {
+        width: 100%;
+        max-width: 420px;
+      }
+      @media (max-width: 600px) {
+        .field {
+          grid-template-columns: 1fr;
+        }
+      }
+      .group-head td {
+        background: var(--neutral-bg);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Instellingen</h1>
+      <p class="lead">
+        Alle filialen worden periodiek opgehaald. Gevolgde filialen bepalen
+        waarvoor je meldingen krijgt.
+      </p>
+
+      <section class="panel">
+        <h2>Gevolgde filialen</h2>
+        <p class="hint">
+          Meldingen voor watchlist-producten komen alleen uit deze filialen.
+          Gevolgde filialen staan overal bovenaan.
+        </p>
+        <div class="stores" id="followBoxes"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Ophalen</h2>
+        <div class="field">
+          <label for="interval">Interval (minuten, 5–1440)</label>
+          <input type="number" id="interval" min="5" max="1440" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Meldingen</h2>
+
+        <h3>E-mail</h3>
+        <div class="field">
+          <label for="mailEnabled">Meldingen per e-mail</label>
+          <span
+            ><input type="checkbox" id="mailEnabled" />
+            <label for="mailEnabled">Ingeschakeld</label></span
+          >
+        </div>
+        <div class="field">
+          <label for="preset">Aanbieder</label>
+          <select id="preset">
+            <option value="">Eigen SMTP-server</option>
+            <option value="gmail">Gmail</option>
+            <option value="microsoft">
+              Microsoft (Outlook / Microsoft 365)
+            </option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="host">SMTP-server</label
+          ><input type="text" id="host" placeholder="smtp.gmail.com" />
+        </div>
+        <div class="field">
+          <label for="port">Poort</label
+          ><input type="number" id="port" min="1" max="65535" />
+        </div>
+        <div class="field">
+          <label for="secure">Versleuteling</label>
+          <select id="secure">
+            <option value="true">SSL/TLS (poort 465)</option>
+            <option value="false">STARTTLS (poort 587)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="user">Gebruikersnaam</label
+          ><input
+            type="text"
+            id="user"
+            autocomplete="off"
+            placeholder="naam@gmail.com"
+          />
+        </div>
+        <div class="field">
+          <label for="password">Wachtwoord / app-wachtwoord</label>
+          <input type="password" id="password" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label for="from">Afzender</label
+          ><input type="text" id="from" placeholder="leeg = gebruikersnaam" />
+        </div>
+        <div class="field">
+          <label for="to">Ontvanger(s)</label
+          ><input
+            type="text"
+            id="to"
+            placeholder="jij@voorbeeld.nl, partner@voorbeeld.nl"
+          />
+        </div>
+        <p class="hint" id="presetHint"></p>
+        <div class="row">
+          <button class="secondary" id="testEmail">Testmail versturen</button>
+          <span id="emailMsg" class="hint"></span>
+        </div>
+
+        <h3>Push (ntfy)</h3>
+        <div class="field">
+          <label for="ntfy">ntfy-URL</label>
+          <input
+            type="url"
+            id="ntfy"
+            placeholder="https://ntfy.sh/mijn-topic"
+          />
+        </div>
+        <div class="row">
+          <button class="secondary" id="testNtfy">Testmelding versturen</button>
+          <span id="ntfyMsg" class="hint"></span>
+        </div>
+      </section>
+
+      <div class="row">
+        <button id="save">Instellingen opslaan</button>
+        <span id="saveMsg" class="hint"></span>
+      </div>
+
+      <section class="panel">
+        <div class="row">
+          <h2 style="margin: 0">Status</h2>
+          <button class="secondary" id="sync">Nu verversen</button>
+          <span id="syncMsg" class="hint"></span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Filiaal</th>
+              <th>Aanbiedingen</th>
+              <th>Laatst opgehaald</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="status"></tbody>
+        </table>
+      </section>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const { $, el, api, send, ago, initShell } = App;
+      initShell("settings");
+
+      const PRESETS = {
+        gmail: {
+          host: "smtp.gmail.com",
+          port: 465,
+          secure: true,
+          hint: "Gmail: zet 2-staps-verificatie aan en maak een app-wachtwoord aan (Google-account → Beveiliging → App-wachtwoorden). Gebruik dat als wachtwoord, niet je normale wachtwoord.",
+        },
+        microsoft: {
+          host: "smtp.office365.com",
+          port: 587,
+          secure: false,
+          hint: "Microsoft: SMTP AUTH moet aan staan voor je mailbox. Werk-/schoolaccounts (Microsoft 365) blokkeren dit vaak of vereisen OAuth; voor persoonlijke Outlook.com-accounts is een app-wachtwoord nodig.",
+        },
+      };
+
+      const applyPreset = () => {
+        const p = PRESETS[$("preset").value];
+        $("presetHint").textContent = p ? p.hint : "";
+        if (!p) return;
+        $("host").value = p.host;
+        $("port").value = p.port;
+        $("secure").value = String(p.secure);
+        if (!$("from").value) $("from").value = $("user").value;
+      };
+      $("preset").onchange = applyPreset;
+      $("user").oninput = () => {
+        if ($("preset").value && !$("from").dataset.touched)
+          $("from").value = $("user").value;
+      };
+      $("from").oninput = () => {
+        $("from").dataset.touched = "1";
+      };
+      $("secure").onchange = () => {
+        if ([465, 587].includes(Number($("port").value)))
+          $("port").value = $("secure").value === "true" ? 465 : 587;
+      };
+
+      const emailPayload = () => ({
+        enabled: $("mailEnabled").checked,
+        host: $("host").value,
+        port: Number($("port").value),
+        secure: $("secure").value === "true",
+        user: $("user").value,
+        password: $("password").value,
+        from: $("from").value,
+        to: $("to").value,
+      });
+
+      async function save() {
+        const s = await send("/api/settings", "PUT", {
+          pollIntervalMin: Number($("interval").value),
+          ntfyUrl: $("ntfy").value,
+          email: emailPayload(),
+        });
+        $("password").value = "";
+        $("password").placeholder = s.email.passwordSet
+          ? "•••••••• (opgeslagen)"
+          : "";
+      }
+
+      const flash = (id, text, isError) => {
+        $(id).textContent = text;
+        $(id).className = isError ? "err" : "hint";
+      };
+
+      async function test(channel, msgId) {
+        flash(msgId, "Versturen…");
+        try {
+          await save();
+          await send(`/api/notify/test/${channel}`, "POST");
+          flash(msgId, "Verstuurd — controleer je inbox/telefoon");
+        } catch (e) {
+          flash(msgId, e.message, true);
+        }
+      }
+      $("testEmail").onclick = () => test("email", "emailMsg");
+      $("testNtfy").onclick = () => test("ntfy", "ntfyMsg");
+      $("save").onclick = async () => {
+        try {
+          await save();
+          flash("saveMsg", "Opgeslagen");
+        } catch (e) {
+          flash("saveMsg", e.message, true);
+        }
+      };
+
+      async function loadStores() {
+        const stores = await api("/api/stores");
+        const box = (s) => {
+          const cb = el("input", { type: "checkbox", checked: s.followed });
+          cb.onchange = async () => {
+            await send(`/api/stores/${s.storeId}/followed`, "PUT", {
+              followed: cb.checked,
+            });
+            loadStores();
+          };
+          return el("label", {}, cb, ` ${s.name}`);
+        };
+        $("followBoxes").replaceChildren(...stores.map(box));
+
+        const row = (s) =>
+          el(
+            "tr",
+            {},
+            el("td", { textContent: s.name }),
+            el("td", { textContent: s.activeOffers }),
+            el("td", { textContent: ago(s.lastSynced) }),
+            el("td", {
+              className: s.lastError ? "err" : "",
+              textContent: s.lastError || (s.lastSynced ? "OK" : "–"),
+            }),
+          );
+        const head = (t) =>
+          el(
+            "tr",
+            { className: "group-head" },
+            el("td", { colSpan: 4, textContent: t }),
+          );
+        const followed = stores.filter((s) => s.followed);
+        const others = stores.filter((s) => !s.followed);
+        $("status").replaceChildren(
+          ...(followed.length
+            ? [head("★ Gevolgde filialen"), ...followed.map(row)]
+            : []),
+          ...(others.length
+            ? [head("Overige filialen"), ...others.map(row)]
+            : []),
+        );
+      }
+
+      async function loadStatus() {
+        const st = await api("/api/status");
+        $("syncMsg").textContent = st.running
+          ? "Bezig met ophalen…"
+          : st.finishedAt
+            ? `Laatste run: ${ago(st.finishedAt)}`
+            : "";
+        $("sync").disabled = st.running;
+      }
+
+      (async () => {
+        const s = await api("/api/settings");
+        $("interval").value = s.pollIntervalMin;
+        $("ntfy").value = s.ntfyUrl;
+        const e = s.email;
+        $("mailEnabled").checked = e.enabled;
+        $("host").value = e.host;
+        $("port").value = e.port;
+        $("secure").value = String(e.secure);
+        $("user").value = e.user;
+        $("from").value = e.from;
+        $("to").value = e.to;
+        $("password").placeholder = e.passwordSet
+          ? "•••••••• (opgeslagen)"
+          : "";
+        $("preset").value =
+          e.host === "smtp.gmail.com"
+            ? "gmail"
+            : e.host === "smtp.office365.com"
+              ? "microsoft"
+              : "";
+        $("presetHint").textContent = PRESETS[$("preset").value]?.hint ?? "";
+        loadStores();
+        loadStatus();
+      })();
+      $("sync").onclick = async () => {
+        await send("/api/sync", "POST");
+        loadStatus();
+      };
+      setInterval(() => {
+        loadStatus();
+        loadStores();
+      }, 10000);
+    </script>
+  </body>
+</html>
