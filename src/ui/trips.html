@@ -114,6 +114,12 @@
       details.alt > div {
         padding: 0 16px 12px;
       }
+      .map-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 6px 0 4px;
+      }
       .footer-actions {
         display: flex;
         justify-content: flex-end;
@@ -159,7 +165,7 @@
         countryTag,
       } = App;
       initShell("trips");
-      const state = { hourlyRate: 0 };
+      const state = { hourlyRate: 0, postcode: "" };
 
       const statusKind = (status) =>
         status === "good" ? "good" : status === "time" ? "warn" : "bad";
@@ -174,6 +180,50 @@
       const signed = (n) => `${n >= 0 ? "+" : "−"}${money(Math.abs(n))}`;
       const storeLabel = (s) =>
         `${s.followed ? "★ " : ""}${s.storeName}${countryTag(s.country)}`;
+
+      /** Google Maps directions: home -> stops -> home. */
+      const mapsUrl = (stops) => {
+        const home = `${state.postcode}, Nederland`;
+        const waypoints = stops
+          .filter((p) => p.lat !== undefined && p.lon !== undefined)
+          .map((p) => `${p.lat},${p.lon}`)
+          .join("|");
+        const params = new URLSearchParams({
+          api: "1",
+          origin: home,
+          destination: home,
+          travelmode: "driving",
+        });
+        if (waypoints) params.set("waypoints", waypoints);
+        return `https://www.google.com/maps/dir/?${params.toString()}`;
+      };
+
+      /** "Bekijk op kaart" + "Naar mijn telefoon" for a set of stops. */
+      const mapActions = (stops, title) => {
+        const url = mapsUrl(stops);
+        const open = el("a", {
+          className: "btn mini",
+          href: url,
+          target: "_blank",
+          rel: "noopener",
+          textContent: "🗺 Bekijk op kaart",
+        });
+        const share = el("button", {
+          className: "secondary mini",
+          textContent: "📱 Naar mijn telefoon",
+        });
+        share.onclick = async () => {
+          share.disabled = true;
+          try {
+            await send("/api/trips/share", "POST", { url, title });
+            share.textContent = "✓ Verstuurd";
+          } catch (e) {
+            share.textContent = e.message;
+            share.disabled = false;
+          }
+        };
+        return el("div", { className: "map-actions" }, open, share);
+      };
 
       /** Small button that ticks the given units off the shopping list and recalculates. */
       const doneButton = (
@@ -240,6 +290,7 @@
               })
             : null,
         ),
+        mapActions(r.stops, routeTitle(r)),
         el(
           "div",
           { className: "stops" },
@@ -371,6 +422,7 @@
               }),
             ),
           ),
+          mapActions([t], storeLabel(t)),
           el(
             "div",
             { className: "footer-actions" },
@@ -415,6 +467,7 @@
           return;
         }
         state.hourlyRate = data.hourlyRate;
+        state.postcode = data.postcode;
         $("summary").textContent =
           `Vanaf ${data.postcode} · benzine ${money(data.fuelPrice)}/l · ${data.consumptionPer100km} l/100 km · ${data.wantedUnits} stuks nog nodig`;
 

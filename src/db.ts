@@ -231,7 +231,128 @@ export function openDb(path: string): DatabaseSync {
     );
   }
   migrateWatchItemsToList(db);
+  migrateToMultiUser(db);
   return db;
+}
+
+/** One-off: move the single-user shape (and its data) to per-user tables. Idempotent. */
+function migrateToMultiUser(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      last_login INTEGER,
+      ntfy_token TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id INTEGER NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (user_id, key)
+    );
+    CREATE TABLE IF NOT EXISTS user_stores (
+      user_id INTEGER NOT NULL,
+      store_id TEXT NOT NULL,
+      followed INTEGER NOT NULL DEFAULT 0,
+      trip_excluded INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, store_id)
+    );
+  `);
+  const cols = (table: string): string[] =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+  db.exec("DROP VIEW IF EXISTS watch_need");
+
+  if (!cols("watch_items").includes("user_id")) {
+    db.exec(`
+      CREATE TABLE watch_items_new (
+        user_id INTEGER NOT NULL DEFAULT 0,
+        article_number TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type_name TEXT NOT NULL,
+        measure TEXT NOT NULL,
+        image TEXT,
+        url TEXT,
+        added_at INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        bought INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, article_number)
+      );
+      INSERT INTO watch_items_new (user_id, article_number, name, type_name, measure, image, url, added_at, quantity, bought)
+        SELECT 0, article_number, name, type_name, measure, image, url, added_at, quantity, bought FROM watch_items;
+      DROP TABLE watch_items;
+      ALTER TABLE watch_items_new RENAME TO watch_items;
+    `);
+  }
+  if (!cols("alerts").includes("user_id")) {
+    db.exec(`
+      CREATE TABLE alerts_new (
+        user_id INTEGER NOT NULL DEFAULT 0,
+        store_id TEXT NOT NULL,
+        offer_number TEXT NOT NULL,
+        article_number TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        price REAL NOT NULL,
+        store_name TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        seen INTEGER NOT NULL DEFAULT 0,
+        note TEXT NOT NULL DEFAULT '',
+        delivery TEXT NOT NULL DEFAULT '',
+        country TEXT NOT NULL DEFAULT 'nl',
+        PRIMARY KEY (user_id, store_id, offer_number)
+      );
+      INSERT INTO alerts_new (user_id, store_id, offer_number, article_number, title, description, price, store_name, created_at, seen, note, delivery, country)
+        SELECT 0, store_id, offer_number, article_number, title, description, price, store_name, created_at, seen, note, delivery, country FROM alerts;
+      DROP TABLE alerts;
+      ALTER TABLE alerts_new RENAME TO alerts;
+    `);
+  }
+  if (!cols("lists").includes("user_id")) {
+    db.exec("ALTER TABLE lists ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0");
+  }
+
+  const flag = db
+    .prepare("SELECT 1 FROM settings WHERE key = 'migrated.multiuser'")
+    .get();
+  if (!flag) {
+    // Per-store flags and personal settings of the single user become "user 0" and are adopted
+    // by the first account that is created.
+    db.exec(`
+      INSERT OR IGNORE INTO user_stores (user_id, store_id, followed, trip_excluded)
+        SELECT 0, store_id, followed, trip_excluded FROM stores WHERE followed = 1 OR trip_excluded = 1;
+      INSERT OR IGNORE INTO user_settings (user_id, key, value)
+        SELECT 0,
+               CASE key WHEN 'email.enabled' THEN 'notify.email' WHEN 'ha.enabled' THEN 'notify.ha' ELSE key END,
+               value
+        FROM settings
+        WHERE key IN ('countries','homePostcode','fuelPrice','consumptionPer100km','maxStops','stopMinutes',
+                      'hourlyRate','maxTripMinutes','routeAllStores','email.enabled','ha.enabled',
+                      'ha.baseUrl','ha.token','ha.targets');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('migrated.multiuser', '1');
+    `);
+  }
+
+  // Pieces still needed per watched article of one user: derived from that user's shopping lists
+  // when the article is on one, otherwise the manual quantity of the watchlist item.
+  db.exec(`
+    CREATE VIEW watch_need AS
+    SELECT w.user_id AS user_id, w.article_number AS article_number,
+      CASE WHEN EXISTS (
+             SELECT 1 FROM list_items li JOIN lists l ON l.id = li.list_id
+             WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
+        THEN (SELECT COALESCE(SUM(MAX(0, li.quantity - COALESCE(
+                (SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0))), 0)
+              FROM list_items li JOIN lists l ON l.id = li.list_id
+              WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
+        ELSE MAX(0, w.quantity - w.bought) END AS needed
+    FROM watch_items w;
+  `);
 }
 
 /** One-off: existing watchlist items become the first shopping list ("Boodschappenlijst"). */
@@ -293,32 +414,43 @@ function migrateWatchItemsToList(db: DatabaseSync): void {
   }
 }
 
+/** Which user is asking, and which countries they have switched on. */
+export type Ctx = { userId: number; countries: string[] };
+
+const placeholders = (n: number): string => Array(n).fill("?").join(",");
+
+/** Stores are global (fetched for everyone); per-user flags live in user_stores. */
 export function upsertStores(
   db: DatabaseSync,
   stores: Store[],
   country = "nl",
 ): void {
   const stmt = db.prepare(
-    // New stores outside the Netherlands start excluded from trips (opt in per store).
-    `INSERT INTO stores (store_id, name, country, enabled, trip_excluded) VALUES (?, ?, ?, 1, ?)
+    `INSERT INTO stores (store_id, name, country, enabled) VALUES (?, ?, ?, 1)
      ON CONFLICT (store_id) DO UPDATE SET name = excluded.name, country = excluded.country, enabled = 1`,
   );
-  for (const s of stores)
-    stmt.run(s.storeId, s.name, country, country === "nl" ? 0 : 1);
+  for (const s of stores) stmt.run(s.storeId, s.name, country);
 }
 
-export function listStores(
-  db: DatabaseSync,
-  options: { includeDisabled?: boolean } = {},
-): StoreRow[] {
+/**
+ * Stores with the user's own flags. Without a context all stores are returned (backend use).
+ * Stores outside the NL start excluded from trips until the user opts in.
+ */
+export function listStores(db: DatabaseSync, ctx?: Ctx): StoreRow[] {
+  const countries = ctx?.countries ?? [];
   const rows = db
     .prepare(
-      `SELECT s.store_id AS storeId, s.name, s.country, s.followed, s.trip_excluded AS tripExcluded, s.last_synced AS lastSynced,
-              s.last_error AS lastError,
+      `SELECT s.store_id AS storeId, s.name, s.country,
+              COALESCE(us.followed, 0) AS followed,
+              COALESCE(us.trip_excluded, CASE WHEN s.country = 'nl' THEN 0 ELSE 1 END) AS tripExcluded,
+              s.last_synced AS lastSynced, s.last_error AS lastError,
               (SELECT COUNT(*) FROM offers o WHERE o.store_id = s.store_id AND o.active = 1) AS activeOffers
-       FROM stores s ${options.includeDisabled ? "" : "WHERE s.enabled = 1"} ORDER BY s.country, s.name`,
+       FROM stores s
+       LEFT JOIN user_stores us ON us.store_id = s.store_id AND us.user_id = ?
+       ${ctx ? `WHERE s.country IN (${placeholders(countries.length)})` : ""}
+       ORDER BY s.country, s.name`,
     )
-    .all() as {
+    .all(ctx?.userId ?? -1, ...countries) as {
     storeId: string;
     name: string;
     country: string;
@@ -337,33 +469,60 @@ export function listStores(
   }));
 }
 
+function upsertUserStore(
+  db: DatabaseSync,
+  userId: number,
+  storeId: string,
+  column: "followed" | "trip_excluded",
+  value: boolean,
+): void {
+  const country = (
+    db.prepare("SELECT country FROM stores WHERE store_id = ?").get(storeId) as
+      { country: string } | undefined
+  )?.country;
+  // A user_stores row replaces the defaults, so seed the other column with its default.
+  const defaultExcluded = country === "nl" || country === undefined ? 0 : 1;
+  db.prepare(
+    `INSERT INTO user_stores (user_id, store_id, followed, trip_excluded)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (user_id, store_id) DO UPDATE SET ${column} = excluded.${column}`,
+  ).run(
+    userId,
+    storeId,
+    column === "followed" ? (value ? 1 : 0) : 0,
+    column === "trip_excluded" ? (value ? 1 : 0) : defaultExcluded,
+  );
+}
+
 export function setFollowed(
   db: DatabaseSync,
+  userId: number,
   storeId: string,
   followed: boolean,
 ): void {
-  db.prepare("UPDATE stores SET followed = ? WHERE store_id = ?").run(
-    followed ? 1 : 0,
-    storeId,
-  );
+  upsertUserStore(db, userId, storeId, "followed", followed);
 }
 
 export function setTripExcluded(
   db: DatabaseSync,
+  userId: number,
   storeId: string,
   excluded: boolean,
 ): void {
-  db.prepare("UPDATE stores SET trip_excluded = ? WHERE store_id = ?").run(
-    excluded ? 1 : 0,
-    storeId,
-  );
+  upsertUserStore(db, userId, storeId, "trip_excluded", excluded);
 }
 
-export function isFollowed(db: DatabaseSync, storeId: string): boolean {
-  const row = db
-    .prepare("SELECT followed FROM stores WHERE store_id = ?")
-    .get(storeId) as { followed: number } | undefined;
-  return row?.followed === 1;
+/** Ids of the users that follow this store (alerts are raised per user). */
+export function followersOf(db: DatabaseSync, storeId: string): number[] {
+  return (
+    db
+      .prepare(
+        `SELECT us.user_id AS id FROM user_stores us
+         JOIN users u ON u.id = us.user_id
+         WHERE us.store_id = ? AND us.followed = 1 AND u.active = 1`,
+      )
+      .all(storeId) as { id: number }[]
+  ).map((r) => r.id);
 }
 
 /** Upserts a store's current offers, records price history, deactivates vanished offers. Returns new offers. */
@@ -476,17 +635,21 @@ const ORDER_BY: Record<NonNullable<OfferFilter["sort"]>, string> = {
 
 export function searchOffers(
   db: DatabaseSync,
+  ctx: Ctx,
   filter: OfferFilter,
 ): { total: number; items: StoredOffer[] } {
-  const where = ["o.active = 1", "s.enabled = 1"];
-  const args: (string | number)[] = [];
+  const where = [
+    "o.active = 1",
+    `s.country IN (${placeholders(ctx.countries.length)})`,
+  ];
+  const args: (string | number)[] = [...ctx.countries];
   if (filter.storeId) {
     where.push("o.store_id = ?");
     args.push(filter.storeId);
   }
   if (filter.scope) {
     where.push(
-      `o.store_id ${filter.scope === "followed" ? "IN" : "NOT IN"} (SELECT store_id FROM stores WHERE followed = 1)`,
+      `COALESCE(us.followed, 0) = ${filter.scope === "followed" ? "1" : "0"}`,
     );
   }
   if (filter.sinceMs !== undefined) {
@@ -503,24 +666,24 @@ export function searchOffers(
     args.push(`%${word}%`);
   }
   const whereSql = where.join(" AND ");
+  const from = `FROM offers o JOIN stores s ON s.store_id = o.store_id
+       LEFT JOIN user_stores us ON us.store_id = s.store_id AND us.user_id = ?`;
   const total = (
     db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM offers o JOIN stores s ON s.store_id = o.store_id WHERE ${whereSql}`,
-      )
-      .get(...args) as { n: number }
+      .prepare(`SELECT COUNT(*) AS n ${from} WHERE ${whereSql}`)
+      .get(ctx.userId, ...args) as { n: number }
   ).n;
   const limit = Math.min(Math.max(filter.limit ?? 60, 1), 200);
   const offset = Math.max(filter.offset ?? 0, 0);
   const rows = db
     .prepare(
-      `SELECT o.*, s.name AS store_name, s.country AS country, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
-       FROM offers o LEFT JOIN stores s ON s.store_id = o.store_id
+      `SELECT o.*, s.name AS store_name, s.country AS country, COALESCE(us.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
+       ${from}
        WHERE ${whereSql}
-       ORDER BY ifnull(s.followed, 0) DESC, ${ORDER_BY[filter.sort ?? "new"]}
+       ORDER BY COALESCE(us.followed, 0) DESC, ${ORDER_BY[filter.sort ?? "new"]}
        LIMIT ${String(limit)} OFFSET ${String(offset)}`,
     )
-    .all(...args) as OfferRow[];
+    .all(ctx.userId, ...args) as OfferRow[];
   return { total, items: rows.map(toOffer) };
 }
 
@@ -533,13 +696,17 @@ export type ArticleInsight = {
 
 export function articleInsights(
   db: DatabaseSync,
+  ctx: Ctx,
   articleNumbers: string[],
 ): Record<string, ArticleInsight> {
   const result: Record<string, ArticleInsight> = {};
   const offersStmt = db.prepare(
-    `SELECT o.*, s.name AS store_name, s.country AS country, ifnull(s.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
-     FROM offers o LEFT JOIN stores s ON s.store_id = o.store_id
-     WHERE o.article_number = ? AND o.active = 1 AND s.enabled = 1 ORDER BY o.price ASC`,
+    `SELECT o.*, s.name AS store_name, s.country AS country, COALESCE(us.followed, 0) AS followed, ${PRIOR_LOW_SQL} AS prior_low
+     FROM offers o JOIN stores s ON s.store_id = o.store_id
+     LEFT JOIN user_stores us ON us.store_id = s.store_id AND us.user_id = ?
+     WHERE o.article_number = ? AND o.active = 1
+       AND s.country IN (${placeholders(ctx.countries.length)})
+     ORDER BY o.price ASC`,
   );
   const lowStmt = db.prepare(
     "SELECT MIN(price) AS low FROM price_history WHERE article_number = ?",
@@ -547,7 +714,9 @@ export function articleInsights(
   for (const article of articleNumbers) {
     const low = lowStmt.get(article) as { low: number | null };
     result[article] = {
-      offers: (offersStmt.all(article) as OfferRow[]).map(toOffer),
+      offers: (
+        offersStmt.all(ctx.userId, article, ...ctx.countries) as OfferRow[]
+      ).map(toOffer),
       lowestEver: low.low ?? undefined,
     };
   }

@@ -576,7 +576,7 @@ dialog.modal textarea {
   opacity: 0.75;
   margin-left: 6px;
 }
-button.danger {
+button.danger:not(.icon) {
   background: var(--bad);
   border-color: var(--bad);
   color: #fff;
@@ -642,4 +642,194 @@ button.danger {
 .stepper strong {
   min-width: 28px;
   text-align: center;
+}
+
+/* settings / admin building blocks */
+.field {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.field input[type="text"],
+.field input[type="url"],
+.field input[type="number"],
+.field input[type="password"],
+.field input[type="email"],
+.field select {
+  width: 100%;
+  max-width: 420px;
+}
+.warn {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+}
+.warn[hidden] {
+  display: none;
+}
+details.channel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 16px;
+  margin-bottom: 14px;
+}
+details.channel > summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+details.channel[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+details.channel .body {
+  padding-bottom: 6px;
+}
+.state {
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+  background: var(--neutral-bg);
+  color: var(--muted);
+}
+.state.on {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 16px;
+  margin: 8px 0 12px;
+}
+.group-head td {
+  background: var(--neutral-bg);
+  font-weight: 700;
+}
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.copy-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.copy-row input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .field {
+    grid-template-columns: 1fr;
+  }
+  .field input[type="text"],
+  .field input[type="url"],
+  .field input[type="number"],
+  .field input[type="password"],
+  .field input[type="email"],
+  .field select {
+    max-width: none;
+  }
+}
+.menu-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.menu-item[hidden] {
+  display: none;
+}
+a.btn.mini {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--info);
+}
+
+/* ---- mobile ---- */
+@media (max-width: 720px) {
+  main {
+    padding: 14px 12px 40px;
+  }
+  h1 {
+    font-size: 21px;
+  }
+  header.shell .inner {
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding: 8px 12px 0;
+    min-height: 0;
+  }
+  header.shell .brand {
+    white-space: nowrap;
+    font-size: 15px;
+    padding: 6px 0;
+  }
+  header.shell .profile {
+    order: 1;
+    margin-left: auto;
+  }
+  header.shell nav {
+    order: 2;
+    flex: 1 1 100%;
+    margin: 6px -6px 0;
+    padding-bottom: 6px;
+  }
+  header.shell nav a {
+    padding: 8px 10px;
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .card .body {
+    padding: 8px 10px 10px;
+  }
+  .toolbar > * {
+    flex: 1 1 100%;
+  }
+  .panel {
+    padding: 12px;
+  }
+  table {
+    font-size: 14px;
+  }
+  th,
+  td {
+    padding: 6px;
+  }
+  .menu {
+    right: -6px;
+    min-width: 200px;
+  }
+  dialog.modal {
+    width: 96vw;
+  }
+  dialog.modal .head,
+  dialog.modal .body,
+  dialog.modal .foot {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+  .money-input {
+    max-width: none;
+  }
+  details.channel {
+    padding: 0 12px;
+  }
 }

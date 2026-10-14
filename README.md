@@ -10,7 +10,7 @@ LAN webpage + service: follow IKEA Tweedekanshoek offers in chosen stores, searc
     pnpm install
     pnpm start        # http://<host>:8080
 
-Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA_COUNTRY`/`IKEA_LANGUAGE` (nl), `IKEA_CLIENT_ID`, `AUTH_USERNAME` (admin), **`AUTH_PASSWORD` (verplicht, min. 8 tekens; `AUTH_DISABLED=true` zet login uit)**, `NTFY_URL` (optional push, e.g. `https://ntfy.sh/<topic>`). E-mail (SMTP) en ntfy stel je in op `/settings`; het SMTP-wachtwoord wordt met AES-256-GCM versleuteld opgeslagen; de sleutel staat in `data/secret.key` (0600) of in `SECRET_KEY` (64 hex-tekens).
+Env: `PORT` (8080), `HOST`, `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
 
 ## Linux service (systemd)
 
@@ -18,12 +18,12 @@ Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA
 
 Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, installeert de dependency, maakt gebruiker `ikea`,
 `/etc/ikea-tweedekans.env` (met gegenereerd wachtwoord en sleutel), de systemd-unit, en start de service.
-Opnieuw uitvoeren = updaten (config en data blijven). Verwijderen: `sudo ./deploy/install.sh --uninstall`.
+Opnieuw uitvoeren = updaten (config en data blijven). Voor elke update wordt een consistente back-up van de database gemaakt in `<datamap>/backups/` (de laatste 10 blijven bewaard). Terugzetten: `sudo ./deploy/restore-backup.sh --list` en daarna `sudo ./deploy/restore-backup.sh [bestand]` (zonder bestand: de nieuwste). De huidige database wordt eerst veiliggesteld, dus een herstel is terug te draaien. Verwijderen: `sudo ./deploy/install.sh --uninstall`.
 Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.js 24 (checksum-geverifieerd) in `/opt/ikea-tweedekans-node`, zonder de systeem-Node aan te passen (nodig: curl, tar, xz). Logs: `journalctl -u ikea-tweedekans -f`.
 
 ## Pages
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
+`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/admin` (beheer), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
 
 Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
 Gevolgde filialen bepalen alleen waarvoor meldingen komen.
@@ -55,8 +55,12 @@ Data (SQLite + `secret.key`) staat in het volume `tweedekans-data` (`/data`). UI
 Draait ntfy op dezelfde host, gebruik dan als ntfy-URL `http://<host>:<NTFY_PORT>/tweedekans`
 (vanuit de container is `localhost` niet de host).
 
-## Beveiliging
+## Accounts en beveiliging
 
-- Alle pagina's en API's vereisen login (sessiecookie: HttpOnly, SameSite=Lax, 30 dagen, `Secure` achter HTTPS-proxy).
-- Max. 5 foute pogingen per IP per 15 min. `/healthz` is publiek.
-- Zet de app achter HTTPS (Nginx Proxy Manager) en bij voorkeur een Access List/IP-beperking in NPM als extra laag.
+- **Meerdere gebruikers:** account maken met e-mail + wachtwoord. Het eerste account wordt beheerder en neemt eventuele bestaande gegevens (single-user versie) over. Zet `ADMIN_EMAIL` zodat alleen dat adres het eerste account kan maken.
+- **Upgrade vanaf de single-user versie:** zet `ADMIN_EMAIL` en laat `AUTH_PASSWORD` eenmalig staan: daarmee wordt het beheerdersaccount automatisch aangemaakt met je bestaande gegevens. Haal `AUTH_PASSWORD` daarna weg.
+- **Persoonlijke data:** watchlist, lijsten, aankopen, meldingen, gevolgde filialen en instellingen zijn per gebruiker. Aanbiedingen en prijzen zijn gedeeld en worden centraal voor alle filialen opgehaald.
+- **Beheer (`/admin`):** gebruikers beheren (rol, activeren, wachtwoord, verwijderen), meldingstypes aan/uit voor iedereen (uit = onzichtbaar en niet verstuurd), SMTP, ophaalinterval en status.
+- **Meldingen:** ntfy-topic per gebruiker is afgeleid en niet aan te passen; e-mail gaat naar het accountadres via de SMTP van de beheerder; Home Assistant is persoonlijk.
+- Sessiecookie: HttpOnly, SameSite=Lax, 30 dagen, `Secure` achter HTTPS; max. 5 foute logins per IP per 15 min. `/healthz` is publiek.
+- Zet de app achter HTTPS (Nginx Proxy Manager) en bij voorkeur een Access List/IP-beperking als extra laag.

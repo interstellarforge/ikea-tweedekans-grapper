@@ -1,9 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { COUNTRIES, isCountry } from "./countries.ts";
+import { COUNTRIES, COUNTRY_CODES, isCountry } from "./countries.ts";
 import {
   articleInsights,
-  isFollowed,
+  followersOf,
   listStores,
   recordSyncError,
   syncStoreOffers,
@@ -11,7 +11,8 @@ import {
 } from "./db.ts";
 import { fetchStoreOffers, fetchStores } from "./ikea-client.ts";
 import { notifyAlert, tagText } from "./notify.ts";
-import { getSettings } from "./settings.ts";
+import { getGlobalSettings } from "./settings.ts";
+import { getUserById } from "./users.ts";
 import { isWatched, recordAlert, setAlertDelivery } from "./watchlist.ts";
 
 export type PollStatus = {
@@ -29,47 +30,53 @@ export const pollStatus: PollStatus = {
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** Fetches all offers of one store; raises alerts for watched articles in followed stores. */
+/** Fetches all offers of one store; raises alerts for the users that follow it and watch the article. */
 export async function pollStore(
   db: DatabaseSync,
   storeId: string,
 ): Promise<number> {
   try {
-    const store = listStores(db, { includeDisabled: true }).find(
-      (st) => st.storeId === storeId,
-    );
+    const store = listStores(db).find((st) => st.storeId === storeId);
     const country = store?.country ?? "nl";
     const language = isCountry(country) ? COUNTRIES[country].apiLanguage : "nl";
     const offers = await fetchStoreOffers(storeId, language);
     const now = Date.now();
     const added = syncStoreOffers(db, storeId, offers, now);
-    if (!isFollowed(db, storeId)) return added.length;
+    const followers = followersOf(db, storeId);
+    if (followers.length === 0 || added.length === 0) return added.length;
     const storeName = store?.name ?? storeId;
-    for (const o of added) {
-      if (!o.articleNumber || !isWatched(db, o.articleNumber)) continue;
-      const tag = articleInsights(db, [o.articleNumber])[
-        o.articleNumber
-      ]?.offers.find(
-        (x) => x.offerNumber === o.offerNumber && x.storeId === storeId,
-      )?.tag;
-      const alert = {
-        storeId,
-        offerNumber: o.offerNumber,
-        articleNumber: o.articleNumber,
-        title: o.title,
-        description: o.description,
-        price: o.price,
-        storeName,
-        createdAt: now,
-        seen: false,
-        country,
-        note: tagText(tag),
-        delivery: "",
-      };
-      if (!recordAlert(db, alert)) continue;
-      void notifyAlert(db, alert).then((delivery) => {
-        setAlertDelivery(db, storeId, o.offerNumber, delivery);
-      });
+    for (const userId of followers) {
+      const user = getUserById(db, userId);
+      if (!user) continue;
+      const ctx = { userId, countries: [country] };
+      for (const o of added) {
+        if (!o.articleNumber || !isWatched(db, userId, o.articleNumber)) {
+          continue;
+        }
+        const tag = articleInsights(db, ctx, [o.articleNumber])[
+          o.articleNumber
+        ]?.offers.find(
+          (x) => x.offerNumber === o.offerNumber && x.storeId === storeId,
+        )?.tag;
+        const alert = {
+          storeId,
+          offerNumber: o.offerNumber,
+          articleNumber: o.articleNumber,
+          title: o.title,
+          description: o.description,
+          price: o.price,
+          storeName,
+          createdAt: now,
+          seen: false,
+          country,
+          note: tagText(tag),
+          delivery: "",
+        };
+        if (!recordAlert(db, userId, alert)) continue;
+        void notifyAlert(db, user, alert).then((delivery) => {
+          setAlertDelivery(db, userId, storeId, o.offerNumber, delivery);
+        });
+      }
     }
     return added.length;
   } catch (error) {
@@ -82,7 +89,7 @@ const runState = { rerunRequested: false };
 const rerunWasRequested = (): boolean => runState.rerunRequested;
 
 async function pollOnce(db: DatabaseSync): Promise<void> {
-  for (const country of getSettings(db).countries) {
+  for (const country of COUNTRY_CODES) {
     try {
       upsertStores(db, await fetchStores(country), country);
     } catch (error) {
@@ -133,7 +140,7 @@ export function startPolling(db: DatabaseSync): () => void {
   const loop = () => {
     void pollAll(db).finally(() => {
       if (stopped) return;
-      timer = setTimeout(loop, getSettings(db).pollIntervalMin * 60_000);
+      timer = setTimeout(loop, getGlobalSettings(db).pollIntervalMin * 60_000);
     });
   };
   loop();

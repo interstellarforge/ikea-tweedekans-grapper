@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { listStores } from "./db.ts";
-import { getSettings } from "./settings.ts";
+import { type Ctx, listStores } from "./db.ts";
+import { getUserSettings } from "./settings.ts";
 import { STORE_COORDS } from "./store-coords.ts";
 
 const DETOUR_FACTOR = 1.3;
@@ -521,6 +521,8 @@ export type StoreTrip = TripResult & {
   storeId: string;
   storeName: string;
   country: string;
+  lat: number | undefined;
+  lon: number | undefined;
   followed: boolean;
   oneWayKm: number;
   distanceSource: Source;
@@ -530,6 +532,8 @@ export type RouteStopView = {
   storeId: string;
   storeName: string;
   country: string;
+  lat: number | undefined;
+  lon: number | undefined;
   followed: boolean;
   /** Leg that ends at this stop. */
   legKm: number;
@@ -650,8 +654,12 @@ function storeLeg(db: DatabaseSync, from: string, to: string): Leg {
     : { km: Number.POSITIVE_INFINITY, minutes: Number.POSITIVE_INFINITY };
 }
 
-export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
-  const settings = getSettings(db);
+export async function computeTrips(
+  db: DatabaseSync,
+  userId: number,
+): Promise<TripsResponse> {
+  const settings = getUserSettings(db, userId);
+  const ctx: Ctx = { userId, countries: settings.countries };
   const postcode = normalizePostcode(settings.homePostcode);
   if (!postcode) {
     return { configured: false, reason: "Vul je postcode in bij Instellingen" };
@@ -659,10 +667,11 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   const watch = db
     .prepare(
       `SELECT w.article_number, w.name, w.type_name, n.needed AS quantity
-       FROM watch_items w JOIN watch_need n ON n.article_number = w.article_number
-       WHERE n.needed > 0`,
+       FROM watch_items w
+       JOIN watch_need n ON n.user_id = w.user_id AND n.article_number = w.article_number
+       WHERE w.user_id = ? AND n.needed > 0`,
     )
-    .all() as {
+    .all(userId) as {
     article_number: string;
     name: string;
     type_name: string;
@@ -670,7 +679,9 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   }[];
   if (watch.length === 0) {
     const total = (
-      db.prepare("SELECT COUNT(*) AS n FROM watch_items").get() as {
+      db
+        .prepare("SELECT COUNT(*) AS n FROM watch_items WHERE user_id = ?")
+        .get(userId) as {
         n: number;
       }
     ).n;
@@ -687,7 +698,7 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
     `SELECT price, original_price FROM offers
      WHERE store_id = ? AND article_number = ? AND active = 1`,
   );
-  const storeList = listStores(db);
+  const storeList = listStores(db, ctx);
   // Driving legs home -> store, a few requests at a time (many stores when BE/DE are enabled).
   const legs = new Map<string, Awaited<ReturnType<typeof homeLeg>>>();
   const candidates = storeList.filter((s) => !s.tripExcluded);
@@ -737,6 +748,8 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
       storeId: store.storeId,
       storeName: store.name,
       country: store.country,
+      lat: STORE_COORDS[store.storeId]?.lat,
+      lon: STORE_COORDS[store.storeId]?.lon,
       followed: store.followed,
       oneWayKm: leg.km,
       distanceSource: leg.source,
@@ -795,6 +808,8 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
         storeId: stop.storeId,
         storeName: storeOf(stop.storeId)?.name ?? stop.storeId,
         country: storeOf(stop.storeId)?.country ?? "nl",
+        lat: STORE_COORDS[stop.storeId]?.lat,
+        lon: STORE_COORDS[stop.storeId]?.lon,
         followed: storeOf(stop.storeId)?.followed ?? false,
         legKm: leg.km,
         legMinutes: leg.minutes,

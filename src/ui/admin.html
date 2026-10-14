@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beheer · IKEA Tweedekans</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .role {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--neutral-bg);
+      }
+      .role.admin {
+        background: var(--info-bg);
+        color: var(--info);
+      }
+      .role.off {
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      td .actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .user-card {
+        display: none;
+      }
+      @media (max-width: 720px) {
+        table.users {
+          display: none;
+        }
+        .user-card {
+          display: block;
+          border-top: 1px solid var(--line);
+          padding: 12px 0;
+        }
+        .user-card:first-child {
+          border-top: 0;
+        }
+        .user-card .actions {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-top: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Beheer</h1>
+      <nav class="tabs" id="tabs">
+        <a href="#gebruikers" data-for="gebruikers">Gebruikers</a>
+        <a href="#meldingen" data-for="meldingen">Meldingstypes</a>
+        <a href="#ophalen" data-for="ophalen">Ophalen &amp; status</a>
+      </nav>
+
+      <div data-tab="gebruikers">
+        <details class="channel" open>
+          <summary>Registratie</summary>
+          <div class="body">
+            <div class="field">
+              <label for="regOpen">Nieuwe accounts</label>
+              <span>
+                <input type="checkbox" id="regOpen" />
+                <label for="regOpen">Iedereen mag zelf een account maken</label>
+              </span>
+            </div>
+            <p class="hint" id="regMsg"></p>
+          </div>
+        </details>
+        <details class="channel" open>
+          <summary>
+            Gebruikers <span class="state" id="userCount"></span>
+          </summary>
+          <div class="body">
+            <div class="table-scroll">
+              <table class="users">
+                <thead>
+                  <tr>
+                    <th>E-mail</th>
+                    <th>Rol</th>
+                    <th>Aangemaakt</th>
+                    <th>Laatst ingelogd</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="users"></tbody>
+              </table>
+            </div>
+            <div id="userCards"></div>
+          </div>
+        </details>
+      </div>
+
+      <div data-tab="meldingen" hidden>
+        <details class="channel" open>
+          <summary>Meldingstypes</summary>
+          <div class="body">
+            <p class="hint">
+              Een uitgezet type is voor gebruikers niet zichtbaar en wordt ook
+              niet meer verstuurd.
+            </p>
+            <div class="field">
+              <label for="chNtfy">Push (ntfy)</label>
+              <span
+                ><input type="checkbox" id="chNtfy" />
+                <label for="chNtfy">Beschikbaar voor gebruikers</label></span
+              >
+            </div>
+            <div class="field">
+              <label for="chEmail">E-mail</label>
+              <span
+                ><input type="checkbox" id="chEmail" />
+                <label for="chEmail">Beschikbaar voor gebruikers</label></span
+              >
+            </div>
+            <div class="field">
+              <label for="chHa">Home Assistant</label>
+              <span
+                ><input type="checkbox" id="chHa" />
+                <label for="chHa">Beschikbaar voor gebruikers</label></span
+              >
+            </div>
+            <p class="hint" id="ntfyInfo"></p>
+          </div>
+        </details>
+        <details class="channel" open>
+          <summary>E-mailserver (SMTP)</summary>
+          <div class="body">
+            <p class="hint">
+              Wordt gebruikt voor e-mailmeldingen aan gebruikers. Gmail: gebruik
+              een app-wachtwoord (smtp.gmail.com, poort 465, SSL/TLS).
+            </p>
+            <div class="field">
+              <label for="smtpHost">Server</label
+              ><input type="text" id="smtpHost" placeholder="smtp.gmail.com" />
+            </div>
+            <div class="field">
+              <label for="smtpPort">Poort</label
+              ><input type="number" id="smtpPort" min="1" max="65535" />
+            </div>
+            <div class="field">
+              <label for="smtpSecure">Versleuteling</label>
+              <select id="smtpSecure">
+                <option value="true">SSL/TLS (poort 465)</option>
+                <option value="false">STARTTLS (poort 587)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="smtpUser">Gebruikersnaam</label
+              ><input type="text" id="smtpUser" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="smtpPassword">Wachtwoord</label
+              ><input
+                type="password"
+                id="smtpPassword"
+                autocomplete="new-password"
+              />
+            </div>
+            <div class="field">
+              <label for="smtpFrom">Afzender</label
+              ><input
+                type="text"
+                id="smtpFrom"
+                placeholder="leeg = gebruikersnaam"
+              />
+            </div>
+            <div class="row">
+              <button class="secondary" id="smtpTest">
+                Testmail naar mezelf
+              </button>
+              <span id="smtpMsg" class="hint"></span>
+            </div>
+          </div>
+        </details>
+        <div class="row">
+          <button id="saveChannels">Opslaan</button>
+          <span id="saveMsg" class="hint"></span>
+        </div>
+      </div>
+
+      <div data-tab="ophalen" hidden>
+        <details class="channel" open>
+          <summary>Ophalen</summary>
+          <div class="body">
+            <p class="hint">
+              Alle filialen van alle landen worden voor iedereen op de
+              achtergrond opgehaald.
+            </p>
+            <div class="field">
+              <label for="interval">Interval (minuten, 5–1440)</label>
+              <input
+                type="number"
+                id="interval"
+                min="5"
+                max="1440"
+                inputmode="numeric"
+              />
+            </div>
+            <div class="row">
+              <button id="saveInterval">Opslaan</button>
+              <span id="intervalMsg" class="hint"></span>
+            </div>
+          </div>
+        </details>
+        <details class="channel" open>
+          <summary>Status</summary>
+          <div class="body">
+            <div class="row">
+              <button class="secondary" id="sync">Nu verversen</button>
+              <span id="syncMsg" class="hint"></span>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Filiaal</th>
+                    <th>Aanbiedingen</th>
+                    <th>Laatst opgehaald</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="status"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      </div>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      const {
+        $,
+        el,
+        api,
+        send,
+        ago,
+        initShell,
+        promptDialog,
+        confirmDialog,
+        countryTag,
+      } = App;
+      initShell("admin");
+      let me = null;
+      const flash = (id, text, isError) => {
+        $(id).textContent = text;
+        $(id).className = isError ? "err" : "hint";
+      };
+      const date = (ms) =>
+        ms
+          ? new Date(ms).toLocaleString("nl-NL", {
+              dateStyle: "short",
+              timeStyle: "short",
+            })
+          : "–";
+
+      // ---- users ----
+      async function loadUsers() {
+        const users = await api("/api/admin/users");
+        $("userCount").textContent = String(users.length);
+        const actions = (u) => {
+          const self = me && u.id === me.id;
+          return el(
+            "div",
+            { className: "actions" },
+            el("button", {
+              className: "secondary mini",
+              textContent:
+                u.role === "admin" ? "Geen beheerder" : "Maak beheerder",
+              onclick: () =>
+                change(u, { role: u.role === "admin" ? "user" : "admin" }),
+            }),
+            el("button", {
+              className: "secondary mini",
+              textContent: u.active ? "Deactiveren" : "Activeren",
+              disabled: self && u.active,
+              onclick: () => change(u, { active: !u.active }),
+            }),
+            el("button", {
+              className: "secondary mini",
+              textContent: "Wachtwoord",
+              onclick: () => resetPassword(u),
+            }),
+            el("button", {
+              className: "secondary mini",
+              textContent: "Verwijderen",
+              disabled: self,
+              onclick: () => remove(u),
+            }),
+          );
+        };
+        const roleChip = (u) =>
+          el("span", {
+            className: `role ${!u.active ? "off" : u.role === "admin" ? "admin" : ""}`,
+            textContent: !u.active
+              ? "gedeactiveerd"
+              : u.role === "admin"
+                ? "beheerder"
+                : "gebruiker",
+          });
+        $("users").replaceChildren(
+          ...users.map((u) =>
+            el(
+              "tr",
+              {},
+              el("td", { textContent: u.email }),
+              el("td", {}, roleChip(u)),
+              el("td", { textContent: date(u.createdAt) }),
+              el("td", { textContent: date(u.lastLogin) }),
+              el("td", {}, actions(u)),
+            ),
+          ),
+        );
+        $("userCards").replaceChildren(
+          ...users.map((u) =>
+            el(
+              "div",
+              { className: "user-card" },
+              el("strong", { textContent: u.email }),
+              " ",
+              roleChip(u),
+              el("div", {
+                className: "meta",
+                textContent: `Aangemaakt ${date(u.createdAt)} · laatst ingelogd ${date(u.lastLogin)}`,
+              }),
+              actions(u),
+            ),
+          ),
+        );
+      }
+
+      async function change(u, changes) {
+        try {
+          await send(`/api/admin/users/${u.id}`, "PUT", changes);
+        } catch (e) {
+          await confirmDialog({
+            title: "Niet gelukt",
+            message: e.message,
+            confirmText: "OK",
+            danger: false,
+          });
+        }
+        loadUsers();
+      }
+
+      async function resetPassword(u) {
+        const pw = await promptDialog({
+          title: `Nieuw wachtwoord voor ${u.email}`,
+          label: "Nieuw wachtwoord (min. 8 tekens)",
+          confirmText: "Instellen",
+        });
+        if (!pw) return;
+        try {
+          await send(`/api/admin/users/${u.id}/password`, "POST", {
+            password: pw,
+          });
+          await confirmDialog({
+            title: "Wachtwoord gewijzigd",
+            message: `Geef het nieuwe wachtwoord door aan ${u.email}.`,
+            confirmText: "OK",
+            danger: false,
+          });
+        } catch (e) {
+          await confirmDialog({
+            title: "Niet gelukt",
+            message: e.message,
+            confirmText: "OK",
+            danger: false,
+          });
+        }
+      }
+
+      async function remove(u) {
+        const ok = await confirmDialog({
+          title: "Gebruiker verwijderen",
+          message: `${u.email} en alle gegevens (watchlist, lijsten, meldingen) definitief verwijderen?`,
+        });
+        if (!ok) return;
+        try {
+          await send(`/api/admin/users/${u.id}`, "DELETE");
+        } catch (e) {
+          await confirmDialog({
+            title: "Niet gelukt",
+            message: e.message,
+            confirmText: "OK",
+            danger: false,
+          });
+        }
+        loadUsers();
+      }
+
+      // ---- global settings ----
+      function applySettings(g) {
+        $("regOpen").checked = g.registrationOpen;
+        $("chNtfy").checked = g.channels.ntfy;
+        $("chEmail").checked = g.channels.email;
+        $("chHa").checked = g.channels.homeAssistant;
+        $("ntfyInfo").textContent = g.ntfyConfigured
+          ? "Elke gebruiker krijgt een eigen, niet aan te passen ntfy-topic onder de server uit NTFY_BASE_URL."
+          : "NTFY_BASE_URL is niet ingesteld: ntfy-meldingen kunnen niet worden verstuurd.";
+        $("smtpHost").value = g.smtp.host;
+        $("smtpPort").value = g.smtp.port;
+        $("smtpSecure").value = String(g.smtp.secure);
+        $("smtpUser").value = g.smtp.user;
+        $("smtpPassword").value = "";
+        $("smtpPassword").placeholder = g.smtp.passwordSet
+          ? "•••••••• (opgeslagen)"
+          : "";
+        $("smtpFrom").value = g.smtp.from;
+        $("interval").value = g.pollIntervalMin;
+      }
+
+      const smtpPayload = () => ({
+        host: $("smtpHost").value,
+        port: Number($("smtpPort").value),
+        secure: $("smtpSecure").value === "true",
+        user: $("smtpUser").value,
+        password: $("smtpPassword").value,
+        from: $("smtpFrom").value,
+      });
+
+      $("regOpen").onchange = async () => {
+        try {
+          applySettings(
+            await send("/api/admin/settings", "PUT", {
+              registrationOpen: $("regOpen").checked,
+            }),
+          );
+          flash("regMsg", "Opgeslagen");
+        } catch (e) {
+          flash("regMsg", e.message, true);
+        }
+      };
+
+      $("saveChannels").onclick = async () => {
+        try {
+          applySettings(
+            await send("/api/admin/settings", "PUT", {
+              channels: {
+                ntfy: $("chNtfy").checked,
+                email: $("chEmail").checked,
+                homeAssistant: $("chHa").checked,
+              },
+              smtp: smtpPayload(),
+            }),
+          );
+          flash("saveMsg", "Opgeslagen");
+        } catch (e) {
+          flash("saveMsg", e.message, true);
+        }
+      };
+
+      $("smtpTest").onclick = async () => {
+        flash("smtpMsg", "Versturen…");
+        try {
+          await send("/api/admin/settings", "PUT", { smtp: smtpPayload() });
+          await send("/api/admin/smtp-test", "POST");
+          flash("smtpMsg", "Verstuurd — controleer je inbox");
+        } catch (e) {
+          flash("smtpMsg", e.message, true);
+        }
+      };
+
+      $("saveInterval").onclick = async () => {
+        try {
+          applySettings(
+            await send("/api/admin/settings", "PUT", {
+              pollIntervalMin: Number($("interval").value),
+            }),
+          );
+          flash("intervalMsg", "Opgeslagen");
+        } catch (e) {
+          flash("intervalMsg", e.message, true);
+        }
+      };
+
+      // ---- status ----
+      async function loadStatus() {
+        const st = await api("/api/admin/status");
+        $("syncMsg").textContent = st.running
+          ? "Bezig met ophalen…"
+          : st.finishedAt
+            ? `Laatste run: ${ago(st.finishedAt)}`
+            : "";
+        $("sync").disabled = st.running;
+        const order = ["nl", "be", "de"];
+        const names = { nl: "Nederland", be: "België", de: "Duitsland" };
+        const rows = [];
+        for (const c of order) {
+          const stores = st.stores.filter((s) => s.country === c);
+          if (!stores.length) continue;
+          rows.push(
+            el(
+              "tr",
+              { className: "group-head" },
+              el("td", { colSpan: 4, textContent: names[c] }),
+            ),
+          );
+          for (const s of stores) {
+            rows.push(
+              el(
+                "tr",
+                {},
+                el("td", { textContent: s.name }),
+                el("td", { textContent: s.activeOffers }),
+                el("td", { textContent: ago(s.lastSynced) }),
+                el("td", {
+                  className: s.lastError ? "err" : "",
+                  textContent: s.lastError || (s.lastSynced ? "OK" : "–"),
+                }),
+              ),
+            );
+          }
+        }
+        $("status").replaceChildren(...rows);
+      }
+      $("sync").onclick = async () => {
+        await send("/api/admin/sync", "POST");
+        loadStatus();
+      };
+
+      // ---- tabs ----
+      const TABS = ["gebruikers", "meldingen", "ophalen"];
+      const showTab = () => {
+        const name = TABS.includes(location.hash.slice(1))
+          ? location.hash.slice(1)
+          : "gebruikers";
+        document.querySelectorAll("[data-tab]").forEach((d) => {
+          d.hidden = d.dataset.tab !== name;
+        });
+        document.querySelectorAll("#tabs a").forEach((a) => {
+          a.classList.toggle("active", a.dataset.for === name);
+        });
+      };
+      window.addEventListener("hashchange", showTab);
+      showTab();
+
+      (async () => {
+        me = await api("/api/profile");
+        applySettings(await api("/api/admin/settings"));
+        loadUsers();
+        loadStatus();
+        setInterval(loadStatus, 10000);
+      })();
+    </script>
+  </body>
+</html>

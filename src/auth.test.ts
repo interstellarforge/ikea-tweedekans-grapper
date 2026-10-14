@@ -1,59 +1,64 @@
 import { expect, test } from "vitest";
 
 import {
-  createAuth,
   hashPassword,
+  issueSession,
+  LoginLimiter,
   parseCookie,
   SESSION_TTL_MS,
   verifyPassword,
+  verifySession,
 } from "./auth.ts";
 
-const auth = createAuth({
-  user: "kees",
-  password: "correct horse",
-  secret: Buffer.alloc(32, 7),
+const secret = Buffer.alloc(32, 7);
+
+test("passwords are hashed and verified", () => {
+  const hash = hashPassword("correct horse");
+  expect(hash.startsWith("scrypt:")).toBe(true);
+  expect(verifyPassword("correct horse", hash)).toBe(true);
+  expect(verifyPassword("wrong", hash)).toBe(false);
+  expect(verifyPassword("anything", "garbage")).toBe(false);
 });
 
-test("credentials and session tokens", () => {
-  expect(auth.checkCredentials("kees", "correct horse")).toBe(true);
-  expect(auth.checkCredentials("kees", "wrong")).toBe(false);
-  expect(auth.checkCredentials("admin", "correct horse")).toBe(false);
+test("session tokens are bound to user, expiry and password", () => {
+  const hashes: Record<number, string> = {
+    1: hashPassword("a"),
+    2: hashPassword("b"),
+  };
+  const lookup = (id: number) => hashes[id];
+  const token = issueSession(secret, 1, hashes[1] ?? "", 1000);
 
-  const token = auth.issueToken(1000);
-  expect(auth.verifyToken(token, 2000)).toBe(true);
-  expect(auth.verifyToken(token, 1000 + SESSION_TTL_MS + 1)).toBe(false);
-  const [expiry = "", mac = ""] = token.split(".");
-  expect(auth.verifyToken(`${String(Number(expiry) + 1)}.${mac}`, 2000)).toBe(
-    false,
-  );
-  expect(auth.verifyToken(undefined)).toBe(false);
+  expect(verifySession(secret, token, lookup, 2000)).toBe(1);
+  expect(
+    verifySession(secret, token, lookup, 1000 + SESSION_TTL_MS + 1),
+  ).toBeUndefined();
+  expect(verifySession(secret, undefined, lookup)).toBeUndefined();
+  expect(verifySession(secret, "garbage", lookup)).toBeUndefined();
+
+  // another user's id in the same token must not validate
+  const [, expiry = "", mac = ""] = token.split(".");
+  expect(
+    verifySession(secret, `2.${expiry}.${mac}`, lookup, 2000),
+  ).toBeUndefined();
+  // a token from a different secret is rejected
+  expect(
+    verifySession(Buffer.alloc(32, 1), token, lookup, 2000),
+  ).toBeUndefined();
+
+  // changing the password invalidates existing sessions
+  hashes[1] = hashPassword("new");
+  expect(verifySession(secret, token, lookup, 2000)).toBeUndefined();
+  // a deleted user has no session
+  expect(verifySession(secret, token, () => undefined, 2000)).toBeUndefined();
   expect(parseCookie("a=1; session=abc%2E1", "session")).toBe("abc.1");
 });
 
 test("locks a client after repeated failures", () => {
-  for (let i = 0; i < 5; i++) auth.recordFailure("1.2.3.4", 1000 + i);
-  expect(auth.isLocked("1.2.3.4", 2000)).toBe(true);
-  expect(auth.isLocked("5.6.7.8", 2000)).toBe(false);
-  expect(auth.isLocked("1.2.3.4", 1000 + 16 * 60_000)).toBe(false);
-});
-
-test("changed password replaces the env password and invalidates old sessions", () => {
-  const state: { hash?: string } = {};
-  const a = createAuth({
-    user: "kees",
-    password: "envpassword",
-    secret: Buffer.alloc(32, 9),
-    getStoredHash: () => state.hash,
-  });
-  const oldToken = a.issueToken(1000);
-  expect(a.checkCredentials("kees", "envpassword")).toBe(true);
-  expect(a.verifyToken(oldToken, 2000)).toBe(true);
-
-  state.hash = hashPassword("new-password-123");
-  expect(verifyPassword("new-password-123", state.hash)).toBe(true);
-  expect(verifyPassword("nope", state.hash)).toBe(false);
-  expect(a.checkCredentials("kees", "new-password-123")).toBe(true);
-  expect(a.checkCredentials("kees", "envpassword")).toBe(false);
-  expect(a.verifyToken(oldToken, 2000)).toBe(false);
-  expect(a.verifyToken(a.issueToken(1000), 2000)).toBe(true);
+  const limiter = new LoginLimiter();
+  for (let i = 0; i < 5; i++) limiter.recordFailure("1.2.3.4", 1000 + i);
+  expect(limiter.isLocked("1.2.3.4", 2000)).toBe(true);
+  expect(limiter.isLocked("5.6.7.8", 2000)).toBe(false);
+  expect(limiter.isLocked("1.2.3.4", 1000 + 16 * 60_000)).toBe(false);
+  limiter.clear("1.2.3.4");
+  expect(limiter.isLocked("1.2.3.4", 2000)).toBe(false);
 });

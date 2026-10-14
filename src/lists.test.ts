@@ -1,7 +1,3 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { expect, test } from "vitest";
 
 import { openDb, syncStoreOffers, upsertStores } from "./db.ts";
@@ -9,6 +5,8 @@ import {
   addListItem,
   createList,
   getLists,
+  ownsItem,
+  ownsList,
   purchaseByArticle,
   recordPieces,
   setItemWatched,
@@ -25,8 +23,11 @@ const product = (articleNumber: string, normalPrice?: number) => ({
   normalPrice,
 });
 
+const NL = ["nl"];
+
 test("lists track pieces, prices and what is still needed", () => {
   const db = openDb(":memory:");
+  const me = 1;
   upsertStores(db, [{ storeId: "088", name: "Amsterdam" }], "nl");
   syncStoreOffers(
     db,
@@ -48,8 +49,8 @@ test("lists track pieces, prices and what is still needed", () => {
     ],
     1000,
   );
-  const kitchen = createList(db, "Keuken", 1);
-  const bedroom = createList(db, "Slaapkamer", 1);
+  const kitchen = createList(db, me, "Keuken", 1);
+  const bedroom = createList(db, me, "Slaapkamer", 1);
   expect(addListItem(db, kitchen, product("70277981", 9), 4, "max", 1)).toBe(
     "added",
   );
@@ -61,17 +62,17 @@ test("lists track pieces, prices and what is still needed", () => {
   );
 
   // not watched yet: nothing is monitored
-  expect(isWatched(db, "70277981")).toBe(false);
-  const itemId = getLists(db)[0]?.items[0]?.id ?? 0;
-  setItemWatched(db, itemId, true, 2);
-  expect(isWatched(db, "70277981")).toBe(true);
+  expect(isWatched(db, me, "70277981")).toBe(false);
+  const itemId = getLists(db, me, NL)[0]?.items[0]?.id ?? 0;
+  setItemWatched(db, me, itemId, true, 2);
+  expect(isWatched(db, me, "70277981")).toBe(true);
   // needed = remaining over both lists
-  expect(listWatchItems(db)[0]?.needed).toBe(6);
+  expect(listWatchItems(db, me, NL)[0]?.needed).toBe(6);
 
   // bought 1 piece at EUR 3.50: remaining 3 in kitchen
   expect(recordPieces(db, itemId, [3.5], "Amsterdam", 3)).toBe(1);
-  expect(listWatchItems(db)[0]?.needed).toBe(5);
-  const view = getLists(db)[0];
+  expect(listWatchItems(db, me, NL)[0]?.needed).toBe(5);
+  const view = getLists(db, me, NL)[0];
   expect(view?.items[0]).toMatchObject({
     bought: 1,
     remaining: 3,
@@ -93,40 +94,33 @@ test("lists track pieces, prices and what is still needed", () => {
   // trip purchase goes to the oldest list that still needs pieces (slaapkamer here)
   purchaseByArticle(
     db,
+    me,
     [{ articleNumber: "70277981", count: 2, unitPrice: 4 }],
     5,
   );
-  expect(getLists(db)[1]?.items[0]?.bought).toBe(2);
-  expect(listWatchItems(db)[0]?.needed).toBe(0);
+  expect(getLists(db, me, NL)[1]?.items[0]?.bought).toBe(2);
+  expect(listWatchItems(db, me, NL)[0]?.needed).toBe(0);
 });
 
-test("existing watchlist items become the first shopping list", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tweedekans-"));
-  const path = join(dir, "t.db");
-  try {
-    const first = openDb(path);
-    first
-      .prepare(
-        "INSERT INTO watch_items (article_number, name, type_name, measure, added_at, quantity, bought) VALUES ('90591705', 'METOD', 'kast', '', 1, 3, 1)",
-      )
-      .run();
-    // simulate a database from before shopping lists existed
-    first.prepare("DELETE FROM settings WHERE key = 'migrated.lists'").run();
-    first.prepare("DELETE FROM lists").run();
-    first.close();
+test("lists, items and purchases belong to one user only", () => {
+  const db = openDb(":memory:");
+  const alice = createList(db, 1, "Keuken", 1);
+  addListItem(db, alice, product("70277981"), 2, "max", 1);
+  const itemId = getLists(db, 1, NL)[0]?.items[0]?.id ?? 0;
+  recordPieces(db, itemId, [3], undefined, 2);
 
-    const db = openDb(path);
-    const lists = getLists(db);
-    expect(lists).toHaveLength(1);
-    expect(lists[0]?.items[0]).toMatchObject({
-      quantity: 3,
-      bought: 1,
-      remaining: 2,
-    });
-    // opening again must not migrate a second time
-    db.close();
-    expect(getLists(openDb(path))).toHaveLength(1);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  expect(ownsList(db, 1, alice)).toBe(true);
+  expect(ownsList(db, 2, alice)).toBe(false);
+  expect(ownsItem(db, 1, itemId)).toBe(true);
+  expect(ownsItem(db, 2, itemId)).toBe(false);
+  expect(getLists(db, 2, NL)).toHaveLength(0);
+
+  // a trip purchase by another user must not touch Alice's list
+  purchaseByArticle(
+    db,
+    2,
+    [{ articleNumber: "70277981", count: 1, unitPrice: 3 }],
+    3,
+  );
+  expect(getLists(db, 1, NL)[0]?.items[0]?.bought).toBe(1);
 });

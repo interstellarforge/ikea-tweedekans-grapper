@@ -90,11 +90,8 @@
       };
 
       api("/api/profile").then((p) => {
-        $("name").textContent = p.username || "Gebruiker";
-        $("letter").textContent = (p.username || "?").charAt(0).toUpperCase();
-        if (!p.authEnabled) {
-          $("pwPanel").hidden = true;
-        }
+        $("name").textContent = p.email || "Gebruiker";
+        $("letter").textContent = (p.email || "?").charAt(0).toUpperCase();
       });
 
       $("logout").onclick = async () => {

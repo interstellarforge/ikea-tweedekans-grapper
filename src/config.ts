@@ -5,12 +5,14 @@ export const config = {
   pollIntervalMin: Number(process.env["POLL_INTERVAL_MIN"] ?? 15),
   country: process.env["IKEA_COUNTRY"] ?? "nl",
   language: process.env["IKEA_LANGUAGE"] ?? "nl",
-  ntfyUrl: process.env["NTFY_URL"],
+  /** Public URL of this app (deep links in notifications), no trailing slash. */
+  appUrl: (process.env["APP_URL"] ?? "").replace(/\/+$/, ""),
+  /** Base URL of the ntfy server; every user gets a personal topic below it. */
+  ntfyBaseUrl: (process.env["NTFY_BASE_URL"] ?? "").replace(/\/+$/, ""),
+  /** Only this e-mail address may create the first (admin) account. Strongly recommended. */
+  adminEmail: (process.env["ADMIN_EMAIL"] ?? "").trim().toLowerCase(),
   // Public client key shipped in IKEA's own as-is web app; override if it rotates.
   clientId:
     process.env["IKEA_CLIENT_ID"] ?? "d530fa19-39b9-4f3f-9276-61146d470502",
-  authUser: process.env["AUTH_USERNAME"] ?? "admin",
-  authPassword: process.env["AUTH_PASSWORD"] ?? "",
-  authDisabled: process.env["AUTH_DISABLED"] === "true",
   apiRoot: "https://web-api.ikea.com/circular/circular-asis",
 };

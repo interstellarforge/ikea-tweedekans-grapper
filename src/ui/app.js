@@ -448,6 +448,7 @@ const App = (() => {
     ["settings", "/settings", "Instellingen"],
     ["profile", "/profile", "Profiel"],
   ];
+  const ADMIN_ITEM = ["admin", "/admin", "Beheer"];
 
   const initShell = (active) => {
     const badge = el("span", { className: "count", hidden: true });
@@ -466,7 +467,7 @@ const App = (() => {
     const avatar = el(
       "button",
       {
-        className: `avatar${MENU.some(([k]) => k === active) ? " active" : ""}`,
+        className: `avatar${[...MENU, ADMIN_ITEM].some(([k]) => k === active) ? " active" : ""}`,
         ariaLabel: "Profiel en menu",
         ariaHaspopup: "true",
         ariaExpanded: "false",
@@ -499,6 +500,16 @@ const App = (() => {
       el("hr"),
       logout,
     );
+    const adminLink = el(
+      "a",
+      {
+        href: ADMIN_ITEM[1],
+        className: `menu-item${active === "admin" ? " active" : ""}`,
+        hidden: true,
+      },
+      ADMIN_ITEM[2],
+    );
+    menu.insertBefore(adminLink, menu.querySelector("hr"));
     const setOpen = (open) => {
       menu.hidden = !open;
       avatar.setAttribute("aria-expanded", String(open));
@@ -530,9 +541,11 @@ const App = (() => {
 
     api("/api/profile")
       .then((p) => {
-        const name = p.username || "gebruiker";
+        const name = p.email || p.username || "gebruiker";
         initial.textContent = name.charAt(0).toUpperCase();
         who.textContent = name;
+        who.title = name;
+        adminLink.hidden = p.role !== "admin";
       })
       .catch(() => {
         /* the menu still works without the name */

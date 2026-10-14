@@ -72,8 +72,42 @@ export PATH="$(dirname "$NODE_BIN"):$PATH"
 command -v npm >/dev/null || die "npm ontbreekt"
 echo "==> Node.js: $NODE_BIN ($("$NODE_BIN" -v))"
 
-echo "==> App kopiëren naar $APP_DIR"
 mkdir -p "$APP_DIR" "$DATA_DIR"
+
+# Consistent backup of the database before every install/update (the schema is migrated on start).
+backup_database() {
+  local db=$DATA_DIR/tweedekans.db
+  if [[ -f $ENV_FILE ]]; then
+    local configured
+    configured=$(grep -E '^DB_PATH=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)
+    [[ -n $configured ]] && db=$configured
+  fi
+  [[ -f $db ]] || return 0
+  local dir out
+  dir=$(dirname "$db")/backups
+  out=$dir/tweedekans-$(date +%Y%m%d-%H%M%S).db
+  mkdir -p "$dir"
+  # VACUUM INTO writes a consistent snapshot even while the service is running.
+  if "$NODE_BIN" -e '
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync(process.argv[1], { readOnly: true });
+    db.exec(`VACUUM INTO ${JSON.stringify(process.argv[2]).replace(/"/g, "\u0027")}`);
+  ' "$db" "$out" 2>/dev/null; then
+    chmod 600 "$out"
+    [[ $SKIP_SYSTEM == 1 ]] || chown -R "$SERVICE_USER": "$dir" 2>/dev/null || true
+    # keep the 10 most recent backups
+    # shellcheck disable=SC2012
+    ls -1t "$dir"/tweedekans-*.db 2>/dev/null | tail -n +11 | xargs -r rm -f
+    echo "==> Backup gemaakt: $out"
+  else
+    rm -f "$out"
+    cp "$db" "$out" && chmod 600 "$out" && echo "==> Backup (bestandskopie) gemaakt: $out" \
+      || echo "Waarschuwing: backup van $db is mislukt" >&2
+  fi
+}
+backup_database
+
+echo "==> App kopiëren naar $APP_DIR"
 rm -rf "$APP_DIR/src"
 cp -R "$SRC_DIR/src" "$SRC_DIR/package.json" "$APP_DIR/"
 (cd "$APP_DIR" && npm install --omit=dev --no-audit --no-fund --silent)
@@ -84,18 +118,20 @@ if [[ $SKIP_SYSTEM != 1 ]]; then
   chown -R "$SERVICE_USER": "$DATA_DIR"
 fi
 
-GENERATED_PASSWORD=
 if [[ ! -f $ENV_FILE ]]; then
   echo "==> Config aanmaken: $ENV_FILE"
-  GENERATED_PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 16)
   umask 077
   cat > "$ENV_FILE" <<ENV
 PORT=8080
 DB_PATH=$DATA_DIR/tweedekans.db
 POLL_INTERVAL_MIN=15
-AUTH_USERNAME=admin
-AUTH_PASSWORD=$GENERATED_PASSWORD
 SECRET_KEY=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# Alleen dit adres mag het eerste account (de beheerder) maken. Sterk aanbevolen.
+ADMIN_EMAIL=${ADMIN_EMAIL:-}
+# Publieke URL van deze app (voor links in meldingen), bijv. https://tweedekans.example.nl
+APP_URL=${APP_URL:-}
+# Basis-URL van je ntfy-server; elke gebruiker krijgt een eigen topic daaronder.
+NTFY_BASE_URL=${NTFY_BASE_URL:-}
 ENV
 fi
 
@@ -138,8 +174,9 @@ systemctl restart "$NAME"
 PORT=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)
 echo
 echo "Klaar. De service draait: http://$(hostname -I 2>/dev/null | awk '{print $1}' || hostname):${PORT}/"
-if [[ -n $GENERATED_PASSWORD ]]; then
-  echo "Login:  admin / $GENERATED_PASSWORD   (staat ook in $ENV_FILE)"
+echo "Eerste keer: open de site en maak een account; het eerste account wordt beheerder."
+if ! grep -q '^ADMIN_EMAIL=.\+' "$ENV_FILE"; then
+  echo "Tip:    zet ADMIN_EMAIL in $ENV_FILE zodat alleen jouw adres het eerste (beheerders)account kan maken."
 fi
 echo "Logs:   journalctl -u $NAME -f"
 echo "Config: $ENV_FILE  (daarna: sudo systemctl restart $NAME)"

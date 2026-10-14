@@ -59,13 +59,58 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 export function createList(
   db: DatabaseSync,
+  userId: number,
   name: string,
   now: number,
 ): number {
   const res = db
-    .prepare("INSERT INTO lists (name, created_at) VALUES (?, ?)")
-    .run(name.trim().slice(0, 60) || "Nieuwe lijst", now);
+    .prepare("INSERT INTO lists (user_id, name, created_at) VALUES (?, ?, ?)")
+    .run(userId, name.trim().slice(0, 60) || "Nieuwe lijst", now);
   return Number(res.lastInsertRowid);
+}
+
+export function ownsList(
+  db: DatabaseSync,
+  userId: number,
+  listId: number,
+): boolean {
+  return (
+    db
+      .prepare("SELECT 1 FROM lists WHERE id = ? AND user_id = ?")
+      .get(listId, userId) !== undefined
+  );
+}
+
+export function ownsItem(
+  db: DatabaseSync,
+  userId: number,
+  itemId: number,
+): boolean {
+  return (
+    db
+      .prepare(
+        `SELECT 1 FROM list_items li JOIN lists l ON l.id = li.list_id
+         WHERE li.id = ? AND l.user_id = ?`,
+      )
+      .get(itemId, userId) !== undefined
+  );
+}
+
+export function ownsPurchase(
+  db: DatabaseSync,
+  userId: number,
+  purchaseId: number,
+): boolean {
+  return (
+    db
+      .prepare(
+        `SELECT 1 FROM purchases p
+         JOIN list_items li ON li.id = p.list_item_id
+         JOIN lists l ON l.id = li.list_id
+         WHERE p.id = ? AND l.user_id = ?`,
+      )
+      .get(purchaseId, userId) !== undefined
+  );
 }
 
 export function renameList(db: DatabaseSync, id: number, name: string): void {
@@ -204,6 +249,7 @@ export function undoPurchase(db: DatabaseSync, purchaseId: number): void {
  */
 export function purchaseByArticle(
   db: DatabaseSync,
+  userId: number,
   items: {
     articleNumber: string;
     count: number;
@@ -213,11 +259,14 @@ export function purchaseByArticle(
   now: number,
 ): void {
   const rows = db.prepare(
-    "SELECT id FROM list_items WHERE article_number = ? ORDER BY list_id, id",
+    `SELECT li.id FROM list_items li JOIN lists l ON l.id = li.list_id
+     WHERE l.user_id = ? AND li.article_number = ? ORDER BY li.list_id, li.id`,
   );
   for (const item of items) {
     let left = Math.round(item.count);
-    for (const row of rows.all(item.articleNumber) as { id: number }[]) {
+    for (const row of rows.all(userId, item.articleNumber) as {
+      id: number;
+    }[]) {
       if (left <= 0) break;
       const done = recordPieces(
         db,
@@ -229,12 +278,15 @@ export function purchaseByArticle(
       left -= done;
     }
     if (left > 0)
-      markPurchased(db, [{ articleNumber: item.articleNumber, count: left }]);
+      markPurchased(db, userId, [
+        { articleNumber: item.articleNumber, count: left },
+      ]);
   }
 }
 
 export function setItemWatched(
   db: DatabaseSync,
+  userId: number,
   itemId: number,
   watched: boolean,
   now: number,
@@ -256,9 +308,10 @@ export function setItemWatched(
   if (!item) return;
   if (watched) {
     db.prepare(
-      `INSERT OR IGNORE INTO watch_items (article_number, name, type_name, measure, image, url, added_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO watch_items (user_id, article_number, name, type_name, measure, image, url, added_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
+      userId,
       item.article_number,
       item.name,
       item.type_name,
@@ -268,14 +321,15 @@ export function setItemWatched(
       now,
     );
   } else {
-    db.prepare("DELETE FROM watch_items WHERE article_number = ?").run(
-      item.article_number,
-    );
+    db.prepare(
+      "DELETE FROM watch_items WHERE user_id = ? AND article_number = ?",
+    ).run(userId, item.article_number);
   }
 }
 
 export function setListWatched(
   db: DatabaseSync,
+  userId: number,
   listId: number,
   watched: boolean,
   now: number,
@@ -283,7 +337,7 @@ export function setListWatched(
   const ids = db
     .prepare("SELECT id FROM list_items WHERE list_id = ?")
     .all(listId) as { id: number }[];
-  for (const { id } of ids) setItemWatched(db, id, watched, now);
+  for (const { id } of ids) setItemWatched(db, userId, id, watched, now);
 }
 
 type ItemRow = {
@@ -299,15 +353,31 @@ type ItemRow = {
   quantity: number;
 };
 
-export function getLists(db: DatabaseSync): ListView[] {
-  const lists = db.prepare("SELECT id, name FROM lists ORDER BY id").all() as {
+export function getLists(
+  db: DatabaseSync,
+  userId: number,
+  countries: string[],
+): ListView[] {
+  const lists = db
+    .prepare("SELECT id, name FROM lists WHERE user_id = ? ORDER BY id")
+    .all(userId) as {
     id: number;
     name: string;
   }[];
   const items = db
-    .prepare("SELECT * FROM list_items ORDER BY id")
-    .all() as ItemRow[];
-  const purchases = db.prepare("SELECT * FROM purchases ORDER BY id").all() as {
+    .prepare(
+      `SELECT li.* FROM list_items li JOIN lists l ON l.id = li.list_id
+       WHERE l.user_id = ? ORDER BY li.id`,
+    )
+    .all(userId) as ItemRow[];
+  const purchases = db
+    .prepare(
+      `SELECT p.* FROM purchases p
+       JOIN list_items li ON li.id = p.list_item_id
+       JOIN lists l ON l.id = li.list_id
+       WHERE l.user_id = ? ORDER BY p.id`,
+    )
+    .all(userId) as {
     id: number;
     list_item_id: number;
     quantity: number;
@@ -317,14 +387,18 @@ export function getLists(db: DatabaseSync): ListView[] {
   }[];
   const bestOffer = db.prepare(
     `SELECT o.price, s.name, s.country FROM offers o JOIN stores s ON s.store_id = o.store_id
-     WHERE o.article_number = ? AND o.active = 1 AND s.enabled = 1 ORDER BY o.price ASC LIMIT 1`,
+     WHERE o.article_number = ? AND o.active = 1
+       AND s.country IN (${countries.map(() => "?").join(",")})
+     ORDER BY o.price ASC LIMIT 1`,
   );
   const originalPrice = db.prepare(
     "SELECT MAX(original_price) AS p FROM offers WHERE article_number = ? AND original_price IS NOT NULL",
   );
   const watched = new Set(
     (
-      db.prepare("SELECT article_number FROM watch_items").all() as {
+      db
+        .prepare("SELECT article_number FROM watch_items WHERE user_id = ?")
+        .all(userId) as {
         article_number: string;
       }[]
     ).map((r) => r.article_number),
@@ -339,7 +413,7 @@ export function getLists(db: DatabaseSync): ListView[] {
   const lookup = (article: string) => {
     let hit = cache.get(article);
     if (!hit) {
-      const best = bestOffer.get(article) as
+      const best = bestOffer.get(article, ...countries) as
         { price: number; name: string; country: string } | undefined;
       const original = (originalPrice.get(article) as { p: number | null }).p;
       hit = { ...(best ? { best } : {}), ...(original ? { original } : {}) };

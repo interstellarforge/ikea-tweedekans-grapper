@@ -10,21 +10,45 @@
         display: grid;
         place-items: center;
         min-height: 100vh;
+        padding: 16px;
       }
-      form {
+      .card-login {
         background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 12px;
-        padding: 28px;
-        width: min(360px, 92vw);
+        padding: 24px;
+        width: min(400px, 100%);
       }
       .brand {
         display: block;
         background: var(--brand);
         padding: 10px 14px;
         border-radius: 8px;
-        margin-bottom: 20px;
+        margin-bottom: 18px;
         text-align: center;
+        color: var(--accent);
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+      .switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+      .switch button {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 10px;
+      }
+      .switch button.active {
+        background: var(--brand);
+        color: #fff;
+        font-weight: 600;
       }
       label {
         display: block;
@@ -34,57 +58,117 @@
       input {
         width: 100%;
       }
-      button {
+      form button[type="submit"] {
         width: 100%;
         margin-top: 18px;
+        padding: 11px;
       }
     </style>
   </head>
   <body>
-    <form id="form">
-      <span class="brand"
-        ><span class="brand" style="padding: 0; margin: 0; background: none"
-          >IKEA TWEEDEKANS</span
-        ></span
-      >
-      <label for="username">Gebruikersnaam</label>
-      <input
-        type="text"
-        id="username"
-        autocomplete="username"
-        required
-        autofocus
-      />
-      <label for="password">Wachtwoord</label>
-      <input
-        type="password"
-        id="password"
-        autocomplete="current-password"
-        required
-      />
-      <button type="submit">Inloggen</button>
-      <p class="err" id="msg" role="alert"></p>
-    </form>
+    <div class="card-login">
+      <span class="brand">IKEA TWEEDEKANS</span>
+      <div class="switch" id="switch" hidden>
+        <button type="button" id="tabLogin" class="active">Inloggen</button>
+        <button type="button" id="tabRegister">Account maken</button>
+      </div>
+      <form id="form">
+        <p class="hint" id="firstNote" hidden>
+          Er zijn nog geen accounts. Het eerste account wordt beheerder.
+        </p>
+        <label for="email">E-mailadres</label>
+        <input
+          type="email"
+          id="email"
+          autocomplete="username"
+          required
+          autofocus
+        />
+        <label for="password">Wachtwoord</label>
+        <input
+          type="password"
+          id="password"
+          autocomplete="current-password"
+          required
+          minlength="8"
+        />
+        <div id="againBox" hidden>
+          <label for="again">Herhaal wachtwoord</label>
+          <input
+            type="password"
+            id="again"
+            autocomplete="new-password"
+            minlength="8"
+          />
+        </div>
+        <button type="submit" id="submit">Inloggen</button>
+        <p class="err" id="msg" role="alert"></p>
+      </form>
+    </div>
     <script>
-      document.getElementById("form").onsubmit = async (e) => {
+      const $ = (id) => document.getElementById(id);
+      let mode = "login";
+      let registrationOpen = false;
+
+      function setMode(next) {
+        mode = next;
+        const reg = mode === "register";
+        $("tabLogin").classList.toggle("active", !reg);
+        $("tabRegister").classList.toggle("active", reg);
+        $("againBox").hidden = !reg;
+        $("again").required = reg;
+        $("password").autocomplete = reg ? "new-password" : "current-password";
+        $("submit").textContent = reg ? "Account maken" : "Inloggen";
+        $("msg").textContent = "";
+      }
+
+      fetch("/api/auth/config")
+        .then((r) => r.json())
+        .then((c) => {
+          registrationOpen = c.registrationOpen;
+          $("switch").hidden = !registrationOpen;
+          if (c.firstAccount) {
+            $("firstNote").hidden = false;
+            setMode("register");
+          }
+        })
+        .catch(() => {});
+
+      $("tabLogin").onclick = () => setMode("login");
+      $("tabRegister").onclick = () => setMode("register");
+
+      $("form").onsubmit = async (e) => {
         e.preventDefault();
-        const msg = document.getElementById("msg");
-        msg.textContent = "";
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            username: document.getElementById("username").value,
-            password: document.getElementById("password").value,
-          }),
-        });
-        if (res.ok) {
-          const next = new URLSearchParams(location.search).get("next");
-          location.href =
-            next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-        } else {
-          msg.textContent =
-            (await res.json().catch(() => ({}))).error || "Inloggen mislukt";
+        $("msg").textContent = "";
+        if (mode === "register" && $("password").value !== $("again").value) {
+          $("msg").textContent = "De wachtwoorden komen niet overeen";
+          return;
+        }
+        $("submit").disabled = true;
+        try {
+          const res = await fetch(
+            mode === "register" ? "/api/register" : "/api/login",
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                email: $("email").value,
+                password: $("password").value,
+              }),
+            },
+          );
+          if (res.ok) {
+            const next = new URLSearchParams(location.search).get("next");
+            location.href =
+              next && next.startsWith("/") && !next.startsWith("//")
+                ? next
+                : "/";
+            return;
+          }
+          $("msg").textContent =
+            (await res.json().catch(() => ({}))).error || "Mislukt";
+        } finally {
+          $("submit").disabled = false;
         }
       };
     </script>

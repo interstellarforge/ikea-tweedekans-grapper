@@ -27,18 +27,6 @@ export function verifyPassword(password: string, stored: string): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-export type Auth = {
-  enabled: boolean;
-  /** Login name (empty when auth is disabled). */
-  user: string;
-  checkCredentials: (user: string, password: string) => boolean;
-  issueToken: (now?: number) => string;
-  verifyToken: (token: string | undefined, now?: number) => boolean;
-  isLocked: (client: string, now?: number) => boolean;
-  recordFailure: (client: string, now?: number) => void;
-  clearFailures: (client: string) => void;
-};
-
 const digest = (s: string): Buffer => createHash("sha256").update(s).digest();
 
 const safeEqual = (a: string, b: string): boolean =>
@@ -55,71 +43,70 @@ export function parseCookie(
   return undefined;
 }
 
-/** Single-user password auth with HMAC-signed, expiring session tokens. */
-export function createAuth(options: {
-  user: string;
-  /** Initial password (env); replaced by a changed password once one is stored. */
-  password: string;
-  secret: Buffer;
-  /** Stored scrypt hash of a password changed through the profile page. */
-  getStoredHash?: () => string | undefined;
-}): Auth {
-  // Sessions are bound to the current password, so changing it logs out other sessions.
-  const generation = (): string =>
-    createHash("sha256")
-      .update(options.getStoredHash?.() ?? "")
-      .digest("hex")
-      .slice(0, 16);
-  const sign = (expiry: string): string =>
-    createHmac("sha256", options.secret)
-      .update(`session:${expiry}:${generation()}`)
-      .digest("base64url");
-  const failures = new Map<string, number[]>();
-  const recent = (client: string, now: number): number[] =>
-    (failures.get(client) ?? []).filter((t) => now - t < FAILURE_WINDOW_MS);
+/** The part of the password hash that binds a session to the current password. */
+const fingerprint = (passwordHash: string): string =>
+  createHash("sha256").update(passwordHash).digest("hex").slice(0, 16);
 
-  return {
-    enabled: true,
-    user: options.user,
-    checkCredentials: (user, password) => {
-      const stored = options.getStoredHash?.();
-      // Evaluate both so timing does not reveal which part was wrong.
-      const userOk = safeEqual(user, options.user);
-      const passwordOk = stored
-        ? verifyPassword(password, stored)
-        : safeEqual(password, options.password);
-      return userOk && passwordOk;
-    },
-    issueToken: (now = Date.now()) => {
-      const expiry = String(now + SESSION_TTL_MS);
-      return `${expiry}.${sign(expiry)}`;
-    },
-    verifyToken: (token, now = Date.now()) => {
-      if (!token) return false;
-      const [expiry, mac] = token.split(".");
-      if (!expiry || !mac || !/^\d+$/.test(expiry)) return false;
-      if (Number(expiry) < now) return false;
-      return safeEqual(mac, sign(expiry));
-    },
-    isLocked: (client, now = Date.now()) =>
-      recent(client, now).length >= MAX_FAILURES,
-    recordFailure: (client, now = Date.now()) => {
-      failures.set(client, [...recent(client, now), now]);
-    },
-    clearFailures: (client) => {
-      failures.delete(client);
-    },
-  };
+const sign = (
+  secret: Buffer,
+  userId: number,
+  expiry: string,
+  passwordHash: string,
+): string =>
+  createHmac("sha256", secret)
+    .update(`session:${String(userId)}:${expiry}:${fingerprint(passwordHash)}`)
+    .digest("base64url");
+
+/** Session token "<userId>.<expiry>.<mac>"; invalid as soon as the password changes. */
+export function issueSession(
+  secret: Buffer,
+  userId: number,
+  passwordHash: string,
+  now = Date.now(),
+): string {
+  const expiry = String(now + SESSION_TTL_MS);
+  return `${String(userId)}.${expiry}.${sign(secret, userId, expiry, passwordHash)}`;
 }
 
-/** Auth that lets everything through (AUTH_DISABLED=true). */
-export const noAuth: Auth = {
-  enabled: false,
-  user: "",
-  checkCredentials: () => true,
-  issueToken: () => "",
-  verifyToken: () => true,
-  isLocked: () => false,
-  recordFailure: () => undefined,
-  clearFailures: () => undefined,
-};
+/** Returns the user id when the token is genuine, unexpired and matches the user's password. */
+export function verifySession(
+  secret: Buffer,
+  token: string | undefined,
+  passwordHashOf: (userId: number) => string | undefined,
+  now = Date.now(),
+): number | undefined {
+  if (!token) return undefined;
+  const [idPart, expiry, mac] = token.split(".");
+  if (!idPart || !expiry || !mac) return undefined;
+  if (!/^\d+$/.test(idPart) || !/^\d+$/.test(expiry)) return undefined;
+  if (Number(expiry) < now) return undefined;
+  const userId = Number(idPart);
+  const passwordHash = passwordHashOf(userId);
+  if (passwordHash === undefined) return undefined;
+  return safeEqual(mac, sign(secret, userId, expiry, passwordHash))
+    ? userId
+    : undefined;
+}
+
+/** In-memory limiter for failed logins per client (IP). */
+export class LoginLimiter {
+  private failures = new Map<string, number[]>();
+
+  private recent(client: string, now: number): number[] {
+    return (this.failures.get(client) ?? []).filter(
+      (t) => now - t < FAILURE_WINDOW_MS,
+    );
+  }
+
+  isLocked(client: string, now = Date.now()): boolean {
+    return this.recent(client, now).length >= MAX_FAILURES;
+  }
+
+  recordFailure(client: string, now = Date.now()): void {
+    this.failures.set(client, [...this.recent(client, now), now]);
+  }
+
+  clear(client: string): void {
+    this.failures.delete(client);
+  }
+}
