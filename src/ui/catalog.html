@@ -26,8 +26,17 @@
     </main>
     <script src="/assets/app.js"></script>
     <script>
-      const { $, el, send, api, initShell, insightChips, debounce, empty } =
-        App;
+      const {
+        $,
+        el,
+        send,
+        api,
+        initShell,
+        insightChips,
+        debounce,
+        empty,
+        addToList,
+      } = App;
       initShell("catalog");
 
       async function search() {
@@ -61,6 +70,12 @@
               await send("/api/watchlist", "PUT", p);
               btn.textContent = "Op watchlist";
             };
+            const toList = el("button", {
+              className: "secondary",
+              textContent: "Op lijst",
+              title: "Op een boodschappenlijst zetten",
+            });
+            toList.onclick = () => addToList(p);
             const chips = insightChips(p.insight);
             return el(
               "div",
@@ -89,6 +104,7 @@
                   "div",
                   { className: "row", style: "margin:0" },
                   btn,
+                  toList,
                   p.url
                     ? el("a", {
                         href: p.url,

@@ -5,10 +5,13 @@ import type { CatalogProduct } from "./ikea-client.ts";
 export type WatchItem = CatalogProduct & {
   addedAt: number;
   availableNow: number;
-  /** How many units are needed (used by the trip check). */
+  /** Manual quantity (used when the article is on no shopping list). */
   quantity: number;
-  /** How many units were already picked up (shopping list). */
   bought: number;
+  /** Pieces still needed: from shopping lists when listed there, else the manual quantity. */
+  needed: number;
+  /** Shopping lists this article is on, with the pieces still needed per list. */
+  lists: { listId: number; listName: string; remaining: number }[];
 };
 
 export type Alert = {
@@ -59,17 +62,25 @@ export function listWatchItems(db: DatabaseSync): WatchItem[] {
       `SELECT w.article_number AS articleNumber, w.name, w.type_name AS typeName, w.measure,
               w.image, w.url, w.added_at AS addedAt, w.quantity, w.bought,
               (SELECT COUNT(*) FROM offers o JOIN stores s ON s.store_id = o.store_id
-                 WHERE o.article_number = w.article_number AND o.active = 1 AND s.enabled = 1) AS availableNow
+                 WHERE o.article_number = w.article_number AND o.active = 1 AND s.enabled = 1) AS availableNow,
+              (SELECT n.needed FROM watch_need n WHERE n.article_number = w.article_number) AS needed
        FROM watch_items w ORDER BY w.added_at DESC`,
     )
-    .all() as (Omit<WatchItem, "image" | "url"> & {
+    .all() as (Omit<WatchItem, "image" | "url" | "lists"> & {
     image: string | null;
     url: string | null;
   })[];
+  const onLists = db.prepare(
+    `SELECT l.id AS listId, l.name AS listName,
+            MAX(0, li.quantity - COALESCE((SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0)) AS remaining
+     FROM list_items li JOIN lists l ON l.id = li.list_id
+     WHERE li.article_number = ? ORDER BY l.id`,
+  );
   return rows.map((r) => ({
     ...r,
     image: r.image ?? undefined,
     url: r.url ?? undefined,
+    lists: onLists.all(r.articleNumber) as WatchItem["lists"],
   }));
 }
 
@@ -111,7 +122,7 @@ export function isWatched(db: DatabaseSync, articleNumber: string): boolean {
   return (
     db
       .prepare(
-        "SELECT 1 FROM watch_items WHERE article_number = ? AND quantity > bought",
+        "SELECT 1 FROM watch_need WHERE article_number = ? AND needed > 0",
       )
       .get(articleNumber) !== undefined
   );

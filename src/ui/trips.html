@@ -176,7 +176,7 @@
       /** Small button that ticks the given units off the shopping list and recalculates. */
       const doneButton = (
         units,
-        title = "Streep deze aantallen af op je boodschappenlijst",
+        title = "Zet deze aantallen met deze prijzen als gekocht op je boodschappenlijst",
       ) => {
         const btn = el("button", {
           className: "secondary mini",
@@ -263,6 +263,8 @@
                 s.units.map((u) => ({
                   articleNumber: u.articleNumber,
                   count: u.count,
+                  unitPrice: Math.round((u.spend / u.count) * 100) / 100,
+                  storeName: s.storeName,
                 })),
               ),
             ),
@@ -374,6 +376,8 @@
               lines.map((i) => ({
                 articleNumber: i.articleNumber,
                 count: i.found,
+                unitPrice: Math.round((i.spend / i.found) * 100) / 100,
+                storeName: t.storeName,
               })),
             ),
           ),

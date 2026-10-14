@@ -31,6 +31,20 @@ import {
   searchCatalog,
 } from "./ikea-client.ts";
 import {
+  addListItem,
+  createList,
+  deleteList,
+  getLists,
+  purchaseByArticle,
+  recordPieces,
+  removeListItem,
+  renameList,
+  setItemQuantity,
+  setItemWatched,
+  setListWatched,
+  undoPurchase,
+} from "./lists.ts";
+import {
   listHaNotifyTargets,
   sendEmail,
   sendHa,
@@ -52,7 +66,6 @@ import {
   listAlerts,
   listWatchItems,
   markAlertsSeen,
-  markPurchased,
   removeWatchItem,
   setBought,
   setQuantity,
@@ -556,18 +569,186 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
     }
 
     if (method === "POST" && path === "/api/list/purchase") {
+      // From the trip check: tick pieces off on the lists, at the price of that offer.
       const body = await readJson(req);
       const items = Array.isArray(body["items"]) ? body["items"] : [];
-      markPurchased(
+      purchaseByArticle(
         db,
         items.flatMap((i: unknown) => {
           const m = i as Record<string, unknown>;
           return typeof m["articleNumber"] === "string" &&
             typeof m["count"] === "number"
-            ? [{ articleNumber: m["articleNumber"], count: m["count"] }]
+            ? [
+                {
+                  articleNumber: m["articleNumber"],
+                  count: m["count"],
+                  unitPrice:
+                    typeof m["unitPrice"] === "number"
+                      ? m["unitPrice"]
+                      : undefined,
+                  storeName: str(m["storeName"]) || undefined,
+                },
+              ]
             : [];
         }),
+        Date.now(),
       );
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === "GET" && path === "/api/lists") {
+      send(res, 200, getLists(db));
+      return;
+    }
+
+    if (method === "POST" && path === "/api/lists") {
+      const body = await readJson(req);
+      send(res, 200, { id: createList(db, str(body["name"]), Date.now()) });
+      return;
+    }
+
+    const listMatch = /^\/api\/lists\/(\d+)$/.exec(path);
+    if (listMatch?.[1]) {
+      const id = Number(listMatch[1]);
+      if (method === "PUT") {
+        const body = await readJson(req);
+        renameList(db, id, str(body["name"]));
+        send(res, 200, { ok: true });
+        return;
+      }
+      if (method === "DELETE") {
+        deleteList(db, id);
+        send(res, 200, { ok: true });
+        return;
+      }
+    }
+
+    const listWatchAll = /^\/api\/lists\/(\d+)\/watch$/.exec(path);
+    if (method === "PUT" && listWatchAll?.[1]) {
+      const body = await readJson(req);
+      setListWatched(
+        db,
+        Number(listWatchAll[1]),
+        body["watched"] !== false,
+        Date.now(),
+      );
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    const listItemsMatch = /^\/api\/lists\/(\d+)\/items$/.exec(path);
+    if (method === "POST" && listItemsMatch?.[1]) {
+      const body = await readJson(req);
+      const listId = Number(listItemsMatch[1]);
+      const articleNumber = str(body["articleNumber"]);
+      if (!/^\d{8}$/.test(articleNumber)) {
+        send(res, 400, { error: "invalid articleNumber" });
+        return;
+      }
+      const quantity = Number(body["quantity"]) || 1;
+      const mode = body["mode"] === "add" ? "add" : "max";
+      let product: CatalogProduct | undefined;
+      const given = body["product"] as Record<string, unknown> | undefined;
+      if (given && str(given["name"])) {
+        product = {
+          articleNumber,
+          name: str(given["name"]),
+          typeName: str(given["typeName"]),
+          measure: str(given["measure"]),
+          image: str(given["image"]) || undefined,
+          url: str(given["url"]) || undefined,
+          price:
+            typeof given["price"] === "number" ? given["price"] : undefined,
+        };
+      } else {
+        try {
+          product = (await searchCatalog(articleNumber)).find(
+            (p) => p.articleNumber === articleNumber,
+          );
+        } catch {
+          product = undefined;
+        }
+      }
+      const fallback = offerProductInfo(db, articleNumber);
+      const result = addListItem(
+        db,
+        listId,
+        {
+          articleNumber,
+          name: product?.name ?? fallback?.title ?? articleNumber,
+          typeName: product?.typeName ?? fallback?.description ?? "",
+          measure: product?.measure ?? "",
+          image: product?.image ?? fallback?.image,
+          url: product?.url,
+          normalPrice: product?.price,
+        },
+        quantity,
+        mode,
+        Date.now(),
+      );
+      send(res, 200, {
+        status:
+          !product && !fallback && result === "added" ? "unknown" : result,
+        name: product
+          ? `${product.name} ${product.typeName}`.trim()
+          : (fallback?.title ?? articleNumber),
+      });
+      return;
+    }
+
+    const itemMatch2 = /^\/api\/list-items\/(\d+)$/.exec(path);
+    if (itemMatch2?.[1]) {
+      const id = Number(itemMatch2[1]);
+      if (method === "PUT") {
+        const body = await readJson(req);
+        if (typeof body["quantity"] === "number") {
+          setItemQuantity(db, id, body["quantity"]);
+        }
+        send(res, 200, { ok: true });
+        return;
+      }
+      if (method === "DELETE") {
+        removeListItem(db, id);
+        send(res, 200, { ok: true });
+        return;
+      }
+    }
+
+    const itemPurchase = /^\/api\/list-items\/(\d+)\/purchase$/.exec(path);
+    if (method === "POST" && itemPurchase?.[1]) {
+      const body = await readJson(req);
+      const pieces = Array.isArray(body["pieces"]) ? body["pieces"] : [];
+      const prices = pieces.map((p: unknown) =>
+        typeof p === "number" ? p : undefined,
+      );
+      const count = recordPieces(
+        db,
+        Number(itemPurchase[1]),
+        prices,
+        str(body["storeName"]) || undefined,
+        Date.now(),
+      );
+      send(res, 200, { recorded: count });
+      return;
+    }
+
+    const itemWatch = /^\/api\/list-items\/(\d+)\/watch$/.exec(path);
+    if (method === "PUT" && itemWatch?.[1]) {
+      const body = await readJson(req);
+      setItemWatched(
+        db,
+        Number(itemWatch[1]),
+        body["watched"] !== false,
+        Date.now(),
+      );
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    const purchaseMatch = /^\/api\/purchases\/(\d+)$/.exec(path);
+    if (method === "DELETE" && purchaseMatch?.[1]) {
+      undoPurchase(db, Number(purchaseMatch[1]));
       send(res, 200, { ok: true });
       return;
     }
@@ -576,61 +757,6 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
       const body = await readJson(req);
       const items = parseShoppingList(str(body["text"])).slice(0, 200);
       send(res, 200, { items });
-      return;
-    }
-
-    if (method === "POST" && path === "/api/list/item") {
-      const body = await readJson(req);
-      const articleNumber = str(body["articleNumber"]);
-      const quantity = Math.min(
-        Math.max(Math.round(Number(body["quantity"]) || 1), 1),
-        99,
-      );
-      if (!/^\d{8}$/.test(articleNumber)) {
-        send(res, 400, { error: "invalid articleNumber" });
-        return;
-      }
-      const current = listWatchItems(db).find(
-        (w) => w.articleNumber === articleNumber,
-      );
-      if (current) {
-        // Adding the same list again must not double the quantities.
-        const changed = quantity > current.quantity;
-        if (changed) setQuantity(db, articleNumber, quantity);
-        send(res, 200, {
-          status: changed ? "updated" : "unchanged",
-          name: `${current.name} ${current.typeName}`.trim(),
-        });
-        return;
-      }
-      let product: CatalogProduct | undefined;
-      try {
-        product = (await searchCatalog(articleNumber)).find(
-          (p) => p.articleNumber === articleNumber,
-        );
-      } catch {
-        product = undefined;
-      }
-      const fallback = offerProductInfo(db, articleNumber);
-      addWatchItem(
-        db,
-        product ?? {
-          articleNumber,
-          name: fallback?.title ?? articleNumber,
-          typeName: fallback?.description ?? "",
-          measure: "",
-          image: fallback?.image,
-          url: undefined,
-        },
-        Date.now(),
-      );
-      setQuantity(db, articleNumber, quantity);
-      send(res, 200, {
-        status: product || fallback ? "added" : "unknown",
-        name: product
-          ? `${product.name} ${product.typeName}`.trim()
-          : (fallback?.title ?? articleNumber),
-      });
       return;
     }
 

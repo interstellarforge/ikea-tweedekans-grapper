@@ -645,7 +645,9 @@ export async function computeTrips(db: DatabaseSync): Promise<TripsResponse> {
   }
   const watch = db
     .prepare(
-      "SELECT article_number, name, type_name, quantity - bought AS quantity FROM watch_items WHERE quantity > bought",
+      `SELECT w.article_number, w.name, w.type_name, n.needed AS quantity
+       FROM watch_items w JOIN watch_need n ON n.article_number = w.article_number
+       WHERE n.needed > 0`,
     )
     .all() as {
     article_number: string;

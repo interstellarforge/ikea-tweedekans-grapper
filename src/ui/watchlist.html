@@ -6,12 +6,58 @@
     <title>Lijsten · IKEA Tweedekans</title>
     <link rel="stylesheet" href="/assets/app.css" />
     <style>
+      /* watchlist cards */
+      .wcard {
+        position: relative;
+      }
+      .wcard .corner {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+      }
+      .wcard .need {
+        font-weight: 700;
+      }
+      .stepper {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .stepper button {
+        padding: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+      }
+      .stepper strong {
+        min-width: 24px;
+        text-align: center;
+      }
+      /* shopping lists */
+      .bon {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px 18px;
+      }
+      .bon .k {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .bon .v {
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .bon .v.good {
+        color: var(--good);
+      }
       .progress {
         height: 10px;
         background: var(--neutral-bg);
         border-radius: 999px;
         overflow: hidden;
-        margin: 8px 0 4px;
+        margin-top: 14px;
       }
       .progress > span {
         display: block;
@@ -19,107 +65,106 @@
         background: var(--good);
         transition: width 0.25s;
       }
-      .item {
+      .line {
         display: grid;
         grid-template-columns: 64px 1fr auto;
-        gap: 12px;
-        align-items: center;
-        padding: 12px 0;
+        gap: 6px 14px;
+        align-items: start;
+        padding: 14px 0;
         border-top: 1px solid var(--line);
       }
-      .item:first-child {
+      .line:first-child {
         border-top: 0;
       }
-      .item img {
+      .line img {
         width: 64px;
         height: 64px;
         object-fit: cover;
         border-radius: 8px;
         background: var(--neutral-bg);
       }
-      .item.done {
-        opacity: 0.55;
+      .line.done {
+        opacity: 0.6;
       }
-      .item.done .ititle {
+      .line .ltitle {
+        font-weight: 700;
+        color: inherit;
+        text-decoration: none;
+      }
+      .line.done .ltitle {
         text-decoration: line-through;
       }
-      .units {
+      .line .price {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .line .price .total {
+        font-weight: 800;
+        font-size: 17px;
+      }
+      .line .price small {
+        display: block;
+        color: var(--muted);
+      }
+      .line .mini-bar {
+        height: 6px;
+        width: 140px;
+        background: var(--neutral-bg);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 4px 0;
+      }
+      .line .mini-bar > span {
+        display: block;
+        height: 100%;
+        background: var(--good);
+      }
+      .line .tools {
         display: flex;
+        gap: 6px;
+        margin-top: 8px;
         flex-wrap: wrap;
-        gap: 6px;
         align-items: center;
-        margin: 6px 0 2px;
       }
-      .units input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-        margin: 0;
-      }
-      .counter {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .counter button {
-        padding: 2px 10px;
-      }
-      .actions {
+      .purch {
+        grid-column: 2 / -1;
+        font-size: 13px;
+        color: var(--muted);
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        align-items: flex-end;
+        gap: 2px;
       }
-      .toolbar-row {
+      .purch div {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .purch button {
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+      }
+      .purch button svg {
+        width: 13px;
+        height: 13px;
+      }
+      .listbar {
         display: flex;
         gap: 8px;
         align-items: center;
         flex-wrap: wrap;
-        margin-bottom: 14px;
+        margin: 4px 0 14px;
       }
-      dialog {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: var(--surface);
-        color: var(--fg);
-        padding: 0;
-        width: min(640px, 94vw);
-      }
-      dialog::backdrop {
-        background: rgba(0, 0, 0, 0.55);
-      }
-      dialog .head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 14px 18px;
-        border-bottom: 1px solid var(--line);
-      }
-      dialog .head h2 {
+      .listbar h2 {
         margin: 0;
-        font-size: 18px;
+        margin-right: auto;
       }
-      dialog .body {
-        padding: 16px 18px;
-        max-height: 70vh;
-        overflow: auto;
-      }
-      dialog .foot {
-        padding: 12px 18px;
-        border-top: 1px solid var(--line);
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
+      .pieces {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 12px;
         align-items: center;
-      }
-      dialog textarea {
-        width: 100%;
-        min-height: 180px;
-        font: inherit;
-        padding: 10px;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--bg);
-        color: var(--fg);
       }
       .imp {
         padding: 8px 0;
@@ -173,18 +218,16 @@
         }
       }
       @media (max-width: 640px) {
-        .item {
+        .line {
           grid-template-columns: 52px 1fr;
         }
-        .item img {
+        .line img {
           width: 52px;
           height: 52px;
         }
-        .item .actions {
-          grid-column: 1 / -1;
-          flex-direction: row;
-          justify-content: space-between;
-          align-items: center;
+        .line .price {
+          grid-column: 2;
+          text-align: left;
         }
       }
     </style>
@@ -204,49 +247,27 @@
 
       <nav class="tabs" id="tabs">
         <a href="#watchlist" data-for="watchlist">Watchlist</a>
-        <a href="#boodschappen" data-for="boodschappen">Boodschappenlijst</a>
+        <a href="#boodschappen" data-for="boodschappen">Boodschappenlijsten</a>
       </nav>
 
       <div data-tab="watchlist">
         <p class="lead">
           Producten die je in de gaten houdt. Je krijgt een melding zodra ze in
-          de tweedekanshoek van een gevolgd filiaal verschijnen.
+          de tweedekanshoek van een gevolgd filiaal verschijnen. Hoeveel je er
+          nog nodig hebt komt uit je boodschappenlijsten.
         </p>
         <div class="grid" id="items"></div>
       </div>
 
       <div data-tab="boodschappen" hidden>
-        <p class="lead">
-          Alles wat je nodig hebt. Streep af per stuk (of via "Gehaald" op de
-          Ritje-check): de Ritje-check en de meldingen rekenen alleen met wat je
-          nog nodig hebt.
-        </p>
-        <section class="panel">
-          <div class="toolbar-row">
-            <div style="flex: 1 1 260px">
-              <strong>Voortgang</strong>
-              <div id="summary" class="hint"></div>
-              <div class="progress">
-                <span id="bar" style="width: 0%"></span>
-              </div>
-            </div>
-            <button id="openPaste">Lijst plakken…</button>
-          </div>
-        </section>
-        <section class="panel">
-          <h2>Nog te halen</h2>
-          <div id="todo"></div>
-        </section>
-        <section class="panel" id="doneBox" hidden>
-          <h2>Gehaald</h2>
-          <div id="done"></div>
-        </section>
+        <div class="pill-row" id="listPills"></div>
+        <div id="listView"></div>
       </div>
     </main>
 
-    <dialog id="pasteDialog">
+    <dialog id="pasteDialog" class="modal">
       <div class="head">
-        <h2>Lijst plakken</h2>
+        <h2>Importeren</h2>
         <button class="secondary" id="closeX" aria-label="Sluiten">✕</button>
       </div>
       <div class="body">
@@ -255,7 +276,7 @@
             Eén product per regel met het artikelnummer (met of zonder punten),
             optioneel met aantal: <code>2x 802.045.62</code>,
             <code>90591705 x3</code>, <code>10557036 4 stuks</code>. Dezelfde
-            lijst opnieuw plakken telt aantallen niet dubbel.
+            lijst opnieuw importeren telt aantallen niet dubbel.
           </p>
           <textarea
             id="paste"
@@ -275,6 +296,36 @@
       </div>
     </dialog>
 
+    <dialog id="buyDialog" class="modal">
+      <div class="head">
+        <h2 id="buyTitle">Gekocht</h2>
+        <button class="secondary" id="buyX" aria-label="Sluiten">✕</button>
+      </div>
+      <div class="body">
+        <div class="row">
+          <label for="buyCount">Hoeveel stuks heb je gekocht?</label>
+          <select id="buyCount"></select>
+        </div>
+        <div class="pieces" id="buyPieces"></div>
+        <div class="row" style="margin-top: 14px">
+          <label for="buyStore">Winkel</label>
+          <input
+            type="text"
+            id="buyStore"
+            list="buyStores"
+            placeholder="optioneel"
+          />
+          <datalist id="buyStores"></datalist>
+        </div>
+        <p class="hint" id="buyHint"></p>
+      </div>
+      <div class="foot">
+        <span id="buyMsg" class="err"></span>
+        <button class="secondary" id="buyCancel">Annuleren</button>
+        <button id="buySave">Opslaan</button>
+      </div>
+    </dialog>
+
     <script src="/assets/app.js"></script>
     <script>
       const {
@@ -290,6 +341,8 @@
         empty,
         chip,
         countryTag,
+        iconButton,
+        ikeaOfferUrl,
       } = App;
       const refreshShell = initShell("watchlist");
 
@@ -357,174 +410,76 @@
         );
       }
 
+      // ---- Watchlist ----
       async function loadItems() {
         const items = await api("/api/watchlist");
         if (!items.length) {
           $("items").replaceChildren(
             empty(
-              'Nog niets op je watchlist. Zoek een product onder "Zoeken in producten".',
+              'Nog niets op je watchlist. Zoek een product onder "Zoeken in producten" of zet items van een boodschappenlijst op de watchlist.',
             ),
           );
           return;
         }
-        const open = items.filter((i) => i.bought < i.quantity);
-        if (!open.length) {
-          $("items").replaceChildren(
-            empty("Alles op je lijst is gehaald. Zie de Boodschappenlijst."),
-          );
-          return;
-        }
-        $("items").replaceChildren(
-          ...open.map((i) => {
-            const rm = el("button", {
-              className: "secondary",
-              textContent: "Verwijderen",
-            });
-            rm.onclick = async () => {
-              await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
-              loadItems();
-            };
-            const chips = insightChips(i.insight);
-            const qty = el("input", {
-              type: "number",
-              min: 1,
-              max: 99,
-              value: i.quantity,
-              style: "width: 70px",
-              ariaLabel: "Aantal nodig",
-            });
-            qty.onchange = async () => {
-              const n = Math.min(
-                Math.max(Math.round(Number(qty.value)) || 1, 1),
-                99,
-              );
-              qty.value = n;
-              await send(`/api/watchlist/${i.articleNumber}/quantity`, "PUT", {
-                quantity: n,
-              });
-            };
-            return el(
-              "div",
-              { className: "card" },
-              el(
-                "a",
-                { href: `/product/${i.articleNumber}` },
-                el("img", { src: i.image || "", loading: "lazy", alt: "" }),
-              ),
-              el(
-                "div",
-                { className: "body" },
-                el("a", {
-                  className: "title",
-                  href: `/product/${i.articleNumber}`,
-                  style: "color:inherit;text-decoration:none",
-                  textContent: `${i.name} ${i.typeName}`,
-                }),
-                el("div", {
-                  className: "meta",
-                  textContent: `art. ${i.articleNumber}${i.measure ? " · " + i.measure : ""}`,
-                }),
-                chips.length
-                  ? chips
-                  : el(
-                      "div",
-                      { className: "chips" },
-                      chip("Niet in tweedekanshoek"),
-                    ),
-                i.insight?.lowestEver !== undefined && i.insight.offers.length
-                  ? el("div", {
-                      className: "meta",
-                      textContent: `Laagste ooit gemeten: ${money(i.insight.lowestEver)}`,
-                    })
-                  : null,
-                el("div", { className: "spacer" }),
-                el("label", { className: "meta" }, "Aantal nodig: ", qty),
-                i.bought
-                  ? el("div", {
-                      className: "meta",
-                      textContent: `${i.bought} al gehaald, nog ${i.quantity - i.bought} nodig`,
-                    })
-                  : null,
-                rm,
-              ),
-            );
-          }),
+        $("items").replaceChildren(...items.map(watchCard));
+      }
+
+      const watchCard = (i) => {
+        const chips = insightChips(i.insight);
+        const manual = i.lists.length === 0;
+        const trash = iconButton(
+          "trash",
+          "Van watchlist halen",
+          async () => {
+            await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
+            loadItems();
+            loadLists();
+          },
+          "danger",
         );
-      }
+        trash.classList.add("corner");
 
-      // ---- Boodschappenlijst ----
-      async function setBought(item, bought) {
-        await send(`/api/watchlist/${item.articleNumber}/bought`, "PUT", {
-          bought,
-        });
-        loadList();
-      }
-
-      const MAX_UNIT_BOXES = 12;
-
-      const listRow = (i) => {
-        const remaining = i.quantity - i.bought;
-        const done = remaining <= 0;
-
-        let control;
-        if (i.quantity <= MAX_UNIT_BOXES) {
-          // One checkbox per unit: tick exactly what you picked up.
-          control = el(
+        let need;
+        if (manual) {
+          const set = async (n) => {
+            await send(`/api/watchlist/${i.articleNumber}/quantity`, "PUT", {
+              quantity: n,
+            });
+            loadItems();
+          };
+          need = el(
             "div",
-            { className: "units" },
-            ...Array.from({ length: i.quantity }, (_, idx) => {
-              const cb = el("input", {
-                type: "checkbox",
-                checked: idx < i.bought,
-                title: `Stuk ${idx + 1} van ${i.quantity}`,
-              });
-              cb.onchange = () => setBought(i, cb.checked ? idx + 1 : idx);
-              return cb;
+            { className: "stepper" },
+            el("button", {
+              className: "secondary",
+              textContent: "−",
+              disabled: i.quantity <= 1,
+              onclick: () => set(i.quantity - 1),
             }),
-            el("span", {
-              className: "meta",
-              textContent: `${i.bought} van ${i.quantity}`,
+            el("strong", { textContent: String(i.quantity) }),
+            el("button", {
+              className: "secondary",
+              textContent: "+",
+              onclick: () => set(i.quantity + 1),
             }),
+            el("span", { className: "meta", textContent: "nodig" }),
           );
         } else {
-          const minus = el("button", {
-            className: "secondary",
-            textContent: "−",
-            disabled: i.bought <= 0,
-          });
-          minus.onclick = () => setBought(i, i.bought - 1);
-          const plus = el("button", {
-            className: "secondary",
-            textContent: "+",
-            disabled: done,
-          });
-          plus.onclick = () => setBought(i, i.bought + 1);
-          control = el(
+          need = el(
             "div",
-            { className: "units" },
-            el(
-              "span",
-              { className: "counter" },
-              minus,
-              el("strong", { textContent: `${i.bought} / ${i.quantity}` }),
-              plus,
+            { className: "chips" },
+            chip(
+              i.needed > 0 ? `Nog nodig: ${i.needed}` : "Alles gekocht",
+              i.needed > 0 ? "info" : "good",
             ),
+            ...i.lists.map((l) => chip(`${l.listName}: ${l.remaining}`)),
           );
         }
 
-        const rm = el("button", {
-          className: "secondary mini",
-          textContent: "Van lijst",
-        });
-        rm.onclick = async () => {
-          await send(`/api/watchlist/${i.articleNumber}`, "DELETE");
-          loadList();
-          loadItems();
-        };
-        const chips = done ? [] : insightChips(i.insight, 2);
         return el(
           "div",
-          { className: `item${done ? " done" : ""}` },
+          { className: "card wcard" },
+          trash,
           el(
             "a",
             { href: `/product/${i.articleNumber}` },
@@ -532,65 +487,508 @@
           ),
           el(
             "div",
-            {},
+            { className: "body" },
             el("a", {
-              className: "ititle",
+              className: "title",
               href: `/product/${i.articleNumber}`,
-              style: "color:inherit;text-decoration:none;font-weight:700",
+              style: "color:inherit;text-decoration:none",
               textContent: `${i.name} ${i.typeName}`.trim(),
             }),
             el("div", {
               className: "meta",
               textContent: `art. ${i.articleNumber}${i.measure ? " · " + i.measure : ""}`,
             }),
-            control,
-            ...(chips.length
+            chips.length
               ? chips
-              : done
-                ? []
-                : [
-                    el(
-                      "div",
-                      { className: "chips" },
-                      chip("Nu niet in de tweedekanshoek"),
-                    ),
-                  ]),
+              : el(
+                  "div",
+                  { className: "chips" },
+                  chip("Niet in tweedekanshoek"),
+                ),
+            i.insight?.lowestEver !== undefined && i.insight.offers.length
+              ? el("div", {
+                  className: "meta",
+                  textContent: `Laagste ooit gemeten: ${money(i.insight.lowestEver)}`,
+                })
+              : null,
+            el("div", { className: "spacer" }),
+            need,
+            i.needed > 0
+              ? el("button", {
+                  className: "secondary mini",
+                  textContent: "✓ Gekocht",
+                  onclick: () => openBuy(i),
+                })
+              : null,
           ),
-          el("div", { className: "actions" }, rm),
         );
       };
 
-      async function loadList() {
-        const items = await api("/api/watchlist");
-        const todo = items.filter((i) => i.bought < i.quantity);
-        const done = items.filter((i) => i.bought >= i.quantity);
-        const units = items.reduce((n, i) => n + i.quantity, 0);
-        const got = items.reduce(
-          (n, i) => n + Math.min(i.bought, i.quantity),
-          0,
+      // ---- Boodschappenlijsten ----
+      let lists = [];
+      let activeListId = Number(sessionStorage.getItem("activeList")) || 0;
+
+      async function loadLists() {
+        lists = await api("/api/lists");
+        if (!lists.some((l) => l.id === activeListId))
+          activeListId = lists[0]?.id ?? 0;
+        renderLists();
+      }
+
+      const itemsLabel = (l) => `${l.totals.bought}/${l.totals.pieces}`;
+
+      function renderLists() {
+        const pills = lists.map((l) => {
+          const b = el(
+            "button",
+            { className: `pill${l.id === activeListId ? " active" : ""}` },
+            l.name,
+            el("small", { textContent: itemsLabel(l) }),
+          );
+          b.onclick = () => {
+            activeListId = l.id;
+            sessionStorage.setItem("activeList", String(l.id));
+            renderLists();
+          };
+          return b;
+        });
+        const add = el("button", {
+          className: "pill",
+          textContent: "＋ Nieuwe lijst",
+        });
+        add.onclick = async () => {
+          const name = prompt("Naam van de nieuwe lijst (bijv. Keuken)");
+          if (!name) return;
+          const r = await send("/api/lists", "POST", { name });
+          activeListId = r.id;
+          sessionStorage.setItem("activeList", String(r.id));
+          loadLists();
+        };
+        $("listPills").replaceChildren(...pills, add);
+
+        const list = lists.find((l) => l.id === activeListId);
+        if (!list) {
+          $("listView").replaceChildren(
+            empty(
+              'Nog geen boodschappenlijst. Kies "＋ Nieuwe lijst" (bijv. Keuken, Woonkamerkast, Slaapkamer).',
+            ),
+          );
+          return;
+        }
+        $("listView").replaceChildren(...listBody(list));
+      }
+
+      const unitPriceText = (it) => {
+        if (it.estimateUnit === undefined) return "prijs onbekend";
+        const src =
+          it.estimateSource === "tweedekans"
+            ? `tweedekans nu${it.bestOffer ? " · " + it.bestOffer.storeName + countryTag(it.bestOffer.country) : ""}`
+            : "nieuwprijs";
+        return `${money(it.estimateUnit)} p/st · ${src}`;
+      };
+
+      const lineRow = (it) => {
+        const done = it.remaining <= 0;
+        const pct = it.quantity
+          ? Math.round((it.bought / it.quantity) * 100)
+          : 0;
+        const tools = el(
+          "div",
+          { className: "tools" },
+          done
+            ? null
+            : el("button", {
+                className: "secondary mini",
+                textContent: "✓ Gekocht",
+                onclick: () => openBuy(it, true),
+              }),
+          iconButton(
+            "eye",
+            it.watched
+              ? "Niet meer bewaken (watchlist)"
+              : "Op de watchlist zetten",
+            async () => {
+              await send(`/api/list-items/${it.id}/watch`, "PUT", {
+                watched: !it.watched,
+              });
+              loadLists();
+              loadItems();
+            },
+            it.watched ? "on" : "",
+          ),
+          iconButton(
+            "trash",
+            "Van lijst halen",
+            async () => {
+              await send(`/api/list-items/${it.id}`, "DELETE");
+              loadLists();
+              loadItems();
+            },
+            "danger",
+          ),
+          it.watched ? chip("op watchlist", "info") : null,
         );
-        $("summary").textContent = items.length
-          ? `${got} van ${units} stuks gehaald · ${done.length} van ${items.length} producten klaar`
-          : "";
-        $("bar").style.width = units
-          ? `${Math.round((got / units) * 100)}%`
-          : "0%";
-        $("todo").replaceChildren(
-          ...(todo.length
-            ? todo.map(listRow)
+
+        const qtyStep = el(
+          "span",
+          { className: "stepper" },
+          el("button", {
+            className: "secondary",
+            textContent: "−",
+            disabled: it.quantity <= Math.max(it.bought, 1),
+            onclick: () => setQty(it, it.quantity - 1),
+          }),
+          el("strong", { textContent: String(it.quantity) }),
+          el("button", {
+            className: "secondary",
+            textContent: "+",
+            onclick: () => setQty(it, it.quantity + 1),
+          }),
+        );
+
+        const purchases = it.purchases.length
+          ? el(
+              "div",
+              { className: "purch" },
+              ...it.purchases.map((p) =>
+                el(
+                  "div",
+                  {},
+                  el("span", {
+                    textContent: `${p.quantity}× ${p.unitPrice !== undefined ? money(p.unitPrice) : "prijs niet bekend"}${p.storeName ? " · " + p.storeName : ""} · ${new Date(p.purchasedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}`,
+                  }),
+                  iconButton("undo", "Ongedaan maken", async () => {
+                    await send(`/api/purchases/${p.id}`, "DELETE");
+                    loadLists();
+                    loadItems();
+                  }),
+                ),
+              ),
+            )
+          : null;
+
+        return el(
+          "div",
+          { className: `line${done ? " done" : ""}` },
+          el(
+            "a",
+            { href: `/product/${it.articleNumber}` },
+            el("img", { src: it.image || "", loading: "lazy", alt: "" }),
+          ),
+          el(
+            "div",
+            {},
+            el("a", {
+              className: "ltitle",
+              href: `/product/${it.articleNumber}`,
+              textContent: `${it.name} ${it.typeName}`.trim(),
+            }),
+            el("div", {
+              className: "meta",
+              textContent: `art. ${it.articleNumber}${it.measure ? " · " + it.measure : ""}`,
+            }),
+            el(
+              "div",
+              { className: "meta" },
+              `${it.bought} van ${it.quantity} gekocht · aantal `,
+              qtyStep,
+            ),
+            el(
+              "div",
+              { className: "mini-bar" },
+              el("span", { style: `width:${pct}%` }),
+            ),
+            el("div", {
+              className: "meta",
+              textContent: done ? "Gekocht" : unitPriceText(it),
+            }),
+            tools,
+          ),
+          el(
+            "div",
+            { className: "price" },
+            el("div", { className: "total", textContent: money(it.lineTotal) }),
+            it.paid > 0
+              ? el("small", {
+                  textContent: `waarvan betaald ${money(it.paid)}`,
+                })
+              : null,
+            it.remaining > 0 && it.estimateUnit !== undefined
+              ? el("small", {
+                  textContent: `${it.remaining} × ${money(it.estimateUnit)} geschat`,
+                })
+              : null,
+          ),
+          purchases,
+        );
+      };
+
+      async function setQty(it, quantity) {
+        await send(`/api/list-items/${it.id}`, "PUT", { quantity });
+        loadLists();
+        loadItems();
+      }
+
+      function listBody(list) {
+        const t = list.totals;
+        const pct = t.pieces ? Math.round((t.bought / t.pieces) * 100) : 0;
+        const allWatched =
+          list.items.length > 0 && list.items.every((i) => i.watched);
+        const kv = (k, v, cls = "") =>
+          el(
+            "div",
+            {},
+            el("div", { className: "k", textContent: k }),
+            el("div", { className: `v ${cls}`, textContent: v }),
+          );
+
+        const bar = el(
+          "div",
+          { className: "listbar" },
+          el("h2", { textContent: list.name }),
+          el("button", {
+            textContent: "Importeren",
+            title:
+              "Producten uit een tekstlijst (bijv. een keukenbon) toevoegen",
+            onclick: () => openPaste(),
+          }),
+          el("button", {
+            className: "secondary",
+            textContent: allWatched
+              ? "Alles van watchlist halen"
+              : "Alles op de watchlist",
+            disabled: list.items.length === 0,
+            onclick: async () => {
+              await send(`/api/lists/${list.id}/watch`, "PUT", {
+                watched: !allWatched,
+              });
+              loadLists();
+              loadItems();
+            },
+          }),
+          iconButton("edit", "Lijst hernoemen", async () => {
+            const name = prompt("Nieuwe naam", list.name);
+            if (!name) return;
+            await send(`/api/lists/${list.id}`, "PUT", { name });
+            loadLists();
+          }),
+          iconButton(
+            "trash",
+            "Lijst verwijderen",
+            async () => {
+              if (
+                !confirm(`Lijst "${list.name}" met alle aankopen verwijderen?`)
+              )
+                return;
+              await send(`/api/lists/${list.id}`, "DELETE");
+              loadLists();
+              loadItems();
+            },
+            "danger",
+          ),
+        );
+
+        const bon = el(
+          "section",
+          { className: "panel" },
+          el(
+            "div",
+            { className: "bon" },
+            kv("Totaal (geschat)", money(t.total)),
+            kv("Al betaald", money(t.paid)),
+            kv("Nog te kopen", money(t.toBuy)),
+            kv("Nieuwprijs", t.atNewPrice ? money(t.atNewPrice) : "–"),
+            kv(
+              "Bespaard",
+              t.atNewPrice ? money(t.saving) : "–",
+              t.saving > 0 ? "good" : "",
+            ),
+          ),
+          el(
+            "div",
+            { className: "progress" },
+            el("span", { style: `width:${pct}%` }),
+          ),
+          el("div", {
+            className: "hint",
+            textContent: `${t.bought} van ${t.pieces} stuks gekocht`,
+          }),
+        );
+
+        const open = list.items.filter((i) => i.remaining > 0);
+        const done = list.items.filter((i) => i.remaining <= 0);
+        const body = el(
+          "section",
+          { className: "panel" },
+          el("h2", { textContent: "Nog te kopen" }),
+          ...(open.length
+            ? open.map(lineRow)
             : [
                 empty(
-                  items.length
-                    ? "Alles gehaald! 🎉"
-                    : 'Je lijst is leeg. Kies "Lijst plakken…" of voeg producten toe via Zoeken in producten.',
+                  list.items.length
+                    ? "Alles gekocht! 🎉"
+                    : 'Deze lijst is leeg. Gebruik "Importeren", of kies "Op lijst" bij Zoeken in producten.',
                 ),
               ]),
         );
-        $("doneBox").hidden = done.length === 0;
-        $("done").replaceChildren(...done.map(listRow));
+        return [
+          bar,
+          bon,
+          body,
+          ...(done.length
+            ? [
+                el(
+                  "section",
+                  { className: "panel" },
+                  el("h2", { textContent: "Gekocht" }),
+                  ...done.map(lineRow),
+                ),
+              ]
+            : []),
+        ];
       }
 
-      // ---- Lijst plakken (modal met voortgang per regel) ----
+      // ---- Gekocht-modal: prijs per stuk ----
+      const buyDialog = $("buyDialog");
+      let buyTarget = null;
+
+      function renderPieces() {
+        const n = Number($("buyCount").value);
+        const first = buyTarget.estimate;
+        const previous = [...$("buyPieces").querySelectorAll("input")].map(
+          (i) => i.value,
+        );
+        $("buyPieces").replaceChildren(
+          ...Array.from({ length: n }, (_, idx) => {
+            const input = el("input", {
+              type: "number",
+              min: 0,
+              step: "0.01",
+              value:
+                previous[idx] ?? (first !== undefined ? String(first) : ""),
+              placeholder: "prijs",
+              style: "width: 130px",
+            });
+            if (idx === 0) {
+              input.oninput = () => {
+                for (const other of [
+                  ...$("buyPieces").querySelectorAll("input"),
+                ].slice(1)) {
+                  if (!other.dataset.touched) other.value = input.value;
+                }
+              };
+            } else {
+              input.oninput = () => {
+                input.dataset.touched = "1";
+              };
+            }
+            return [
+              el("label", { textContent: `Stuk ${idx + 1} — € per stuk` }),
+              input,
+            ];
+          }).flat(),
+        );
+      }
+
+      /** target: a list item (inList=true) or a watchlist item (manual quantity). */
+      async function openBuy(target, inList = false) {
+        let item = target;
+        if (!inList) {
+          // From the watchlist: use the first shopping-list item that still needs pieces.
+          const fresh = await api("/api/lists");
+          for (const l of fresh) {
+            const found = l.items.find(
+              (x) =>
+                x.articleNumber === target.articleNumber && x.remaining > 0,
+            );
+            if (found) {
+              item = found;
+              inList = true;
+              break;
+            }
+          }
+        }
+        const remaining = inList ? item.remaining : item.needed;
+        const best = inList
+          ? item.bestOffer
+          : item.insight?.offers?.[0]
+            ? {
+                price: item.insight.offers[0].price,
+                storeName: item.insight.offers[0].storeName,
+              }
+            : undefined;
+        const estimate = inList ? item.estimateUnit : best?.price;
+        buyTarget = {
+          inList,
+          item,
+          estimate,
+          articleNumber: item.articleNumber,
+        };
+        $("buyTitle").textContent =
+          `Gekocht: ${`${item.name} ${item.typeName}`.trim()}`;
+        $("buyCount").replaceChildren(
+          ...Array.from(
+            { length: Math.max(1, Math.min(remaining, 50)) },
+            (_, k) =>
+              el("option", {
+                value: String(k + 1),
+                textContent: String(k + 1),
+              }),
+          ),
+        );
+        $("buyCount").value = "1";
+        $("buyPieces").replaceChildren();
+        $("buyStore").value = best?.storeName ?? "";
+        $("buyHint").textContent =
+          estimate !== undefined
+            ? `Voorgesteld: ${money(estimate)} per stuk (${best ? "tweedekans nu" : "nieuwprijs"}). Pas de prijs aan als je minder of meer hebt betaald.`
+            : "Vul de prijs per stuk in.";
+        $("buyMsg").textContent = "";
+        $("buySave").disabled = false;
+        renderPieces();
+        buyDialog.showModal();
+      }
+      $("buyCount").onchange = renderPieces;
+      $("buyX").onclick = () => buyDialog.close();
+      $("buyCancel").onclick = () => buyDialog.close();
+      $("buySave").onclick = async () => {
+        const prices = [...$("buyPieces").querySelectorAll("input")].map((i) =>
+          i.value === "" ? null : Number(i.value),
+        );
+        $("buySave").disabled = true;
+        try {
+          const store = $("buyStore").value;
+          if (buyTarget.inList) {
+            await send(
+              `/api/list-items/${buyTarget.item.id}/purchase`,
+              "POST",
+              { pieces: prices, storeName: store },
+            );
+          } else {
+            for (const price of prices) {
+              await send("/api/list/purchase", "POST", {
+                items: [
+                  {
+                    articleNumber: buyTarget.articleNumber,
+                    count: 1,
+                    unitPrice: price ?? undefined,
+                    storeName: store || undefined,
+                  },
+                ],
+              });
+            }
+          }
+          buyDialog.close();
+          loadLists();
+          loadItems();
+          loadTrips();
+        } catch (e) {
+          $("buyMsg").textContent = e.message;
+          $("buySave").disabled = false;
+        }
+      };
+
+      // ---- Importeren (modal met voortgang per regel) ----
       const dialog = $("pasteDialog");
       let importing = false;
 
@@ -600,22 +998,21 @@
         $("importMsg").textContent = "";
         $("startImport").textContent = "Toevoegen";
         $("startImport").disabled = false;
-        $("cancel").textContent = "Annuleren";
         $("cancel").hidden = false;
         $("cancel").disabled = false;
         $("closeX").disabled = false;
         $("importRows").replaceChildren();
       };
-      $("openPaste").onclick = () => {
+      function openPaste() {
         resetDialog();
         $("paste").value = "";
         dialog.showModal();
         $("paste").focus();
-      };
+      }
       const closeDialog = () => {
         if (importing) return;
         dialog.close();
-        loadList();
+        loadLists();
         loadItems();
       };
       $("closeX").onclick = closeDialog;
@@ -686,9 +1083,10 @@
           r.bar.className = "bar running";
           r.status.textContent = "opzoeken…";
           try {
-            const res = await send("/api/list/item", "POST", {
+            const res = await send(`/api/lists/${activeListId}/items`, "POST", {
               articleNumber: r.item.articleNumber,
               quantity: r.item.quantity,
+              mode: "max",
             });
             counts[res.status] = (counts[res.status] ?? 0) + 1;
             r.label.textContent = `${r.item.quantity}× ${res.name}`;
@@ -718,7 +1116,7 @@
         $("startImport").disabled = false;
         $("cancel").hidden = true;
         $("closeX").disabled = false;
-        loadList();
+        loadLists();
         loadItems();
       };
 
@@ -745,15 +1143,15 @@
       };
       loadAlerts();
       loadItems();
-      loadList();
+      loadLists();
       loadTrips();
       setInterval(() => {
-        if (importing || dialog.open) return;
+        if (importing || dialog.open || buyDialog.open) return;
         if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName))
           return;
         loadAlerts();
         loadItems();
-        loadList();
+        loadLists();
         loadTrips();
       }, 60000);
     </script>

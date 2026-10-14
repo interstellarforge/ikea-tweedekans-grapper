@@ -82,6 +82,33 @@ export function openDb(path: string): DatabaseSync {
       url TEXT,
       added_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS list_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      list_id INTEGER NOT NULL,
+      article_number TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type_name TEXT NOT NULL,
+      measure TEXT NOT NULL,
+      image TEXT,
+      url TEXT,
+      normal_price REAL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      added_at INTEGER NOT NULL,
+      UNIQUE (list_id, article_number)
+    );
+    CREATE TABLE IF NOT EXISTS purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      list_item_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      unit_price REAL,
+      store_name TEXT,
+      purchased_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS home_geo (
       postcode TEXT PRIMARY KEY,
       lat REAL NOT NULL,
@@ -177,6 +204,19 @@ export function openDb(path: string): DatabaseSync {
       "ALTER TABLE stores ADD COLUMN trip_excluded INTEGER NOT NULL DEFAULT 0",
     );
   }
+  // How many pieces are still needed per watched article: derived from shopping lists when the
+  // article is on one, otherwise the manual quantity of the watchlist item.
+  db.exec(`
+    DROP VIEW IF EXISTS watch_need;
+    CREATE VIEW watch_need AS
+    SELECT w.article_number AS article_number,
+      CASE WHEN EXISTS (SELECT 1 FROM list_items li WHERE li.article_number = w.article_number)
+        THEN (SELECT COALESCE(SUM(MAX(0, li.quantity - COALESCE(
+                (SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0))), 0)
+              FROM list_items li WHERE li.article_number = w.article_number)
+        ELSE MAX(0, w.quantity - w.bought) END AS needed
+    FROM watch_items w;
+  `);
   const watchCols = (
     db.prepare("PRAGMA table_info(watch_items)").all() as { name: string }[]
   ).map((c) => c.name);
@@ -190,7 +230,67 @@ export function openDb(path: string): DatabaseSync {
       "ALTER TABLE watch_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1",
     );
   }
+  migrateWatchItemsToList(db);
   return db;
+}
+
+/** One-off: existing watchlist items become the first shopping list ("Boodschappenlijst"). */
+function migrateWatchItemsToList(db: DatabaseSync): void {
+  const done = db
+    .prepare("SELECT 1 FROM settings WHERE key = 'migrated.lists'")
+    .get();
+  if (done) return;
+  const items = db.prepare("SELECT * FROM watch_items").all() as {
+    article_number: string;
+    name: string;
+    type_name: string;
+    measure: string;
+    image: string | null;
+    url: string | null;
+    quantity: number;
+    bought: number;
+    added_at: number;
+  }[];
+  db.exec("BEGIN");
+  try {
+    if (items.length > 0) {
+      const listId = Number(
+        db
+          .prepare("INSERT INTO lists (name, created_at) VALUES (?, ?)")
+          .run("Boodschappenlijst", Date.now()).lastInsertRowid,
+      );
+      const insertItem = db.prepare(
+        `INSERT INTO list_items (list_id, article_number, name, type_name, measure, image, url, quantity, added_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      const insertPurchase = db.prepare(
+        "INSERT INTO purchases (list_item_id, quantity, unit_price, store_name, purchased_at) VALUES (?, ?, NULL, NULL, ?)",
+      );
+      for (const w of items) {
+        const itemId = Number(
+          insertItem.run(
+            listId,
+            w.article_number,
+            w.name,
+            w.type_name,
+            w.measure,
+            w.image,
+            w.url,
+            w.quantity,
+            w.added_at,
+          ).lastInsertRowid,
+        );
+        if (w.bought > 0) insertPurchase.run(itemId, w.bought, Date.now());
+      }
+    }
+    db.prepare(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('migrated.lists', '1')",
+    ).run();
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function upsertStores(
@@ -199,10 +299,12 @@ export function upsertStores(
   country = "nl",
 ): void {
   const stmt = db.prepare(
-    `INSERT INTO stores (store_id, name, country, enabled) VALUES (?, ?, ?, 1)
+    // New stores outside the Netherlands start excluded from trips (opt in per store).
+    `INSERT INTO stores (store_id, name, country, enabled, trip_excluded) VALUES (?, ?, ?, 1, ?)
      ON CONFLICT (store_id) DO UPDATE SET name = excluded.name, country = excluded.country, enabled = 1`,
   );
-  for (const s of stores) stmt.run(s.storeId, s.name, country);
+  for (const s of stores)
+    stmt.run(s.storeId, s.name, country, country === "nl" ? 0 : 1);
 }
 
 export function listStores(

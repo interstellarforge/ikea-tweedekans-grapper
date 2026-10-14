@@ -189,6 +189,147 @@ const App = (() => {
     );
   };
 
+  const SVG = {
+    trash: "M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6",
+    eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z",
+    check: "M4 12l5 5L20 6",
+    undo: "M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3",
+    plus: "M12 5v14M5 12h14",
+    edit: "M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4",
+  };
+  /** Small inline SVG icon (24x24 viewBox). */
+  const icon = (name) => {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", SVG[name] ?? "");
+    svg.append(path);
+    return svg;
+  };
+  const iconButton = (name, label, onclick, extra = "") => {
+    const b = el("button", {
+      className: `icon ${extra}`.trim(),
+      title: label,
+      ariaLabel: label,
+    });
+    b.append(icon(name));
+    b.onclick = onclick;
+    return b;
+  };
+
+  /** Dialog to put a product on one of the shopping lists (or a new one). */
+  const addToList = async (product) => {
+    const lists = await api("/api/lists");
+    const dlg = el("dialog", { className: "modal" });
+    const select = el(
+      "select",
+      {},
+      ...lists.map((l) =>
+        el("option", { value: String(l.id), textContent: l.name }),
+      ),
+      el("option", { value: "new", textContent: "＋ Nieuwe lijst…" }),
+    );
+    const newName = el("input", {
+      type: "text",
+      placeholder: "Naam van de nieuwe lijst",
+      hidden: !!lists.length,
+    });
+    if (!lists.length) select.value = "new";
+    select.onchange = () => {
+      newName.hidden = select.value !== "new";
+    };
+    const qty = el("input", {
+      type: "number",
+      min: 1,
+      max: 99,
+      value: 1,
+      style: "width: 90px",
+    });
+    const msg = el("span", { className: "hint" });
+    const close = () => {
+      dlg.close();
+      dlg.remove();
+    };
+    const save = el("button", { textContent: "Toevoegen" });
+    save.onclick = async () => {
+      save.disabled = true;
+      try {
+        let listId = Number(select.value);
+        if (select.value === "new") {
+          const created = await send("/api/lists", "POST", {
+            name: newName.value || "Nieuwe lijst",
+          });
+          listId = created.id;
+        }
+        await send(`/api/lists/${listId}/items`, "POST", {
+          articleNumber: product.articleNumber,
+          quantity: Number(qty.value) || 1,
+          mode: "add",
+          product,
+        });
+        msg.textContent = "Toegevoegd";
+        setTimeout(close, 600);
+      } catch (e) {
+        msg.className = "err";
+        msg.textContent = e.message;
+        save.disabled = false;
+      }
+    };
+    dlg.append(
+      el(
+        "div",
+        { className: "head" },
+        el("h2", { textContent: "Op boodschappenlijst" }),
+        el("button", {
+          className: "secondary",
+          textContent: "✕",
+          ariaLabel: "Sluiten",
+          onclick: close,
+        }),
+      ),
+      el(
+        "div",
+        { className: "body" },
+        el(
+          "p",
+          {},
+          el("strong", {
+            textContent: `${product.name} ${product.typeName ?? ""}`.trim(),
+          }),
+        ),
+        el(
+          "div",
+          { className: "row" },
+          el("label", { textContent: "Lijst" }),
+          select,
+          newName,
+        ),
+        el(
+          "div",
+          { className: "row" },
+          el("label", { textContent: "Aantal" }),
+          qty,
+        ),
+      ),
+      el(
+        "div",
+        { className: "foot" },
+        msg,
+        el("button", {
+          className: "secondary",
+          textContent: "Annuleren",
+          onclick: close,
+        }),
+        save,
+      ),
+    );
+    document.body.append(dlg);
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.showModal();
+  };
+
   const NAV = [
     ["watchlist", "/watchlist", "Lijsten"],
     ["catalog", "/catalog", "Zoeken in producten"],
@@ -330,6 +471,9 @@ const App = (() => {
     insightChips,
     ikeaOfferUrl,
     countryTag,
+    icon,
+    iconButton,
+    addToList,
     duration,
     groupOffers,
     offerCard,

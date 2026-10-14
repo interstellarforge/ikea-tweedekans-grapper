@@ -114,97 +114,125 @@
       </nav>
 
       <div data-tab="filialen">
-        <section class="panel">
-          <h2>Landen</h2>
-          <p class="hint">
-            Van welke landen worden tweedekansaanbiedingen opgehaald? België (8
-            filialen) en Duitsland (54 filialen) staan standaard uit; Duitsland
-            maakt het ophalen en de ritberekening merkbaar zwaarder. Meldingen
-            komen alleen uit filialen die je volgt.
-          </p>
-          <div class="stores" id="countryBoxes"></div>
-          <p class="hint" id="countryMsg"></p>
-        </section>
-        <section class="panel">
-          <h2>Gevolgde filialen</h2>
-          <p class="hint">
-            Alle filialen worden opgehaald. Meldingen voor watchlist-producten
-            komen alleen uit gevolgde filialen, en die staan overal bovenaan.
-            Wijzigingen worden direct opgeslagen.
-          </p>
-          <div class="stores" id="followBoxes"></div>
-        </section>
+        <details class="channel" open>
+          <summary>Landen</summary>
+          <div class="body">
+            <p class="hint">
+              Van welke landen worden tweedekansaanbiedingen opgehaald? België
+              (8 filialen) en Duitsland (54 filialen) staan standaard uit;
+              Duitsland maakt het ophalen en de ritberekening merkbaar zwaarder.
+              Meldingen komen alleen uit filialen die je volgt.
+            </p>
+            <div class="stores" id="countryBoxes"></div>
+            <p class="hint" id="countryMsg"></p>
+          </div>
+        </details>
+        <details class="channel" open>
+          <summary>Gevolgde filialen</summary>
+          <div class="body">
+            <p class="hint">
+              Alle filialen worden opgehaald. Meldingen voor watchlist-producten
+              komen alleen uit gevolgde filialen, en die staan overal bovenaan.
+              Wijzigingen worden direct opgeslagen.
+            </p>
+            <div class="stores" id="followBoxes"></div>
+          </div>
+        </details>
       </div>
 
       <div data-tab="ritje" hidden>
-        <section class="panel">
-          <h2>Ritje-check</h2>
-          <p class="hint">
-            Hiermee berekent de app per filiaal of een rit de moeite waard is:
-            besparing op de producten uit je watchlist (aantallen per product)
-            minus brandstofkosten van de retour-rit.
-          </p>
-          <div class="field">
-            <label for="postcode">Postcode</label>
-            <input
-              type="text"
-              id="postcode"
-              placeholder="1234 AB"
-              autocomplete="postal-code"
-            />
+        <details class="channel" open>
+          <summary>Ritje-check</summary>
+          <div class="body">
+            <p class="hint">
+              Hiermee berekent de app per filiaal of een rit de moeite waard is:
+              besparing op de producten uit je watchlist (aantallen per product)
+              minus brandstofkosten van de retour-rit.
+            </p>
+            <div class="field">
+              <label for="postcode">Postcode</label>
+              <input
+                type="text"
+                id="postcode"
+                placeholder="1234 AB"
+                autocomplete="postal-code"
+              />
+            </div>
+            <div class="field">
+              <label for="fuelPrice">Benzineprijs (€ per liter)</label>
+              <input
+                type="number"
+                id="fuelPrice"
+                min="0.5"
+                max="5"
+                step="0.01"
+              />
+            </div>
+            <div class="field">
+              <label for="maxStops">Max. aantal stops (filialen) per rit</label>
+              <input type="number" id="maxStops" min="1" max="8" step="1" />
+            </div>
+            <p class="warn" id="maxStopsWarn" hidden>
+              Let op: bij meer dan 4 stops wordt de volgorde met een snelle
+              benadering bepaald (niet gegarandeerd de kortste), het rekenen
+              duurt langer, en zo'n rit kost in de praktijk veel tijd.
+            </p>
+            <div class="field">
+              <label for="stopMinutes"
+                >Tijd per filiaal (minuten ophalen)</label
+              >
+              <input
+                type="number"
+                id="stopMinutes"
+                min="0"
+                max="240"
+                step="5"
+              />
+            </div>
+            <div class="field">
+              <label for="hourlyRate">Waarde van je tijd (€ per uur)</label>
+              <input type="number" id="hourlyRate" min="0" max="500" step="1" />
+            </div>
+            <p class="hint">
+              Wordt van het nettovoordeel afgetrokken (rijden + tijd in de
+              winkel). Is een rit wel in geld rendabel maar niet meer na
+              tijdkosten, dan wordt hij oranje getoond. 0 = tijd negeren.
+            </p>
+            <div class="field">
+              <label for="routeAll">Routes langs filialen</label>
+              <span>
+                <input type="checkbox" id="routeAll" />
+                <label for="routeAll">
+                  Routes mogen langs alle (niet-uitgesloten) filialen gaan
+                </label>
+              </span>
+            </div>
+            <p class="hint">
+              Uitgevinkt: routes gebruiken alleen filialen die je volgt.
+            </p>
+            <div class="field">
+              <label for="consumption">Verbruik (liter per 100 km)</label>
+              <input
+                type="number"
+                id="consumption"
+                min="1"
+                max="40"
+                step="0.1"
+              />
+            </div>
           </div>
-          <div class="field">
-            <label for="fuelPrice">Benzineprijs (€ per liter)</label>
-            <input type="number" id="fuelPrice" min="0.5" max="5" step="0.01" />
+        </details>
+        <details class="channel" open>
+          <summary>Filialen in ritten</summary>
+          <div class="body">
+            <p class="hint">
+              Haal het vinkje weg bij filialen die je nooit wilt bezoeken. Die
+              worden niet meegenomen in de Ritje-check en in combinatieroutes.
+              Wijzigingen worden direct opgeslagen.
+            </p>
+            <div class="stores" id="tripBoxes"></div>
           </div>
-          <div class="field">
-            <label for="maxStops">Max. aantal stops (filialen) per rit</label>
-            <input type="number" id="maxStops" min="1" max="8" step="1" />
-          </div>
-          <p class="warn" id="maxStopsWarn" hidden>
-            Let op: bij meer dan 4 stops wordt de volgorde met een snelle
-            benadering bepaald (niet gegarandeerd de kortste), het rekenen duurt
-            langer, en zo'n rit kost in de praktijk veel tijd.
-          </p>
-          <div class="field">
-            <label for="stopMinutes">Tijd per filiaal (minuten ophalen)</label>
-            <input type="number" id="stopMinutes" min="0" max="240" step="5" />
-          </div>
-          <div class="field">
-            <label for="hourlyRate">Waarde van je tijd (€ per uur)</label>
-            <input type="number" id="hourlyRate" min="0" max="500" step="1" />
-          </div>
-          <p class="hint">
-            Wordt van het nettovoordeel afgetrokken (rijden + tijd in de
-            winkel). Is een rit wel in geld rendabel maar niet meer na
-            tijdkosten, dan wordt hij oranje getoond. 0 = tijd negeren.
-          </p>
-          <div class="field">
-            <label for="routeAll">Routes langs filialen</label>
-            <span>
-              <input type="checkbox" id="routeAll" />
-              <label for="routeAll">
-                Routes mogen langs alle (niet-uitgesloten) filialen gaan
-              </label>
-            </span>
-          </div>
-          <p class="hint">
-            Uitgevinkt: routes gebruiken alleen filialen die je volgt.
-          </p>
-          <div class="field">
-            <label for="consumption">Verbruik (liter per 100 km)</label>
-            <input type="number" id="consumption" min="1" max="40" step="0.1" />
-          </div>
-        </section>
-        <section class="panel">
-          <h2>Filialen in ritten</h2>
-          <p class="hint">
-            Haal het vinkje weg bij filialen die je nooit wilt bezoeken. Die
-            worden niet meegenomen in de Ritje-check en in combinatieroutes.
-            Wijzigingen worden direct opgeslagen.
-          </p>
-          <div class="stores" id="tripBoxes"></div>
-        </section>
+        </details>
       </div>
 
       <div data-tab="meldingen" hidden>
@@ -375,31 +403,35 @@
       </div>
 
       <div data-tab="status" hidden>
-        <section class="panel">
-          <h2>Ophalen</h2>
-          <div class="field">
-            <label for="interval">Interval (minuten, 5–1440)</label>
-            <input type="number" id="interval" min="5" max="1440" />
+        <details class="channel" open>
+          <summary>Ophalen</summary>
+          <div class="body">
+            <div class="field">
+              <label for="interval">Interval (minuten, 5–1440)</label>
+              <input type="number" id="interval" min="5" max="1440" />
+            </div>
           </div>
-        </section>
-        <section class="panel">
-          <div class="row">
-            <h2 style="margin: 0">Status</h2>
-            <button class="secondary" id="sync">Nu verversen</button>
-            <span id="syncMsg" class="hint"></span>
+        </details>
+        <details class="channel" open>
+          <summary>Status</summary>
+          <div class="body">
+            <div class="row">
+              <button class="secondary" id="sync">Nu verversen</button>
+              <span id="syncMsg" class="hint"></span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Filiaal</th>
+                  <th>Aanbiedingen</th>
+                  <th>Laatst opgehaald</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="status"></tbody>
+            </table>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Filiaal</th>
-                <th>Aanbiedingen</th>
-                <th>Laatst opgehaald</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="status"></tbody>
-          </table>
-        </section>
+        </details>
       </div>
 
       <div class="row" id="saveBar">

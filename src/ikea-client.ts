@@ -109,6 +109,8 @@ export type CatalogProduct = {
   measure: string;
   image: string | undefined;
   url: string | undefined;
+  /** Current regular price (EUR), when the catalog gives one. */
+  price?: number | undefined;
 };
 
 type CatalogProductDto = {
@@ -118,6 +120,9 @@ type CatalogProductDto = {
   itemMeasureReferenceText?: string;
   mainImageUrl?: string;
   pipUrl?: string;
+  salesPrice?: {
+    current?: { wholeNumber?: string; decimals?: string };
+  };
   gprDescription?: { variants?: CatalogProductDto[] };
 };
 
@@ -127,6 +132,16 @@ type CatalogDto = {
   };
 };
 
+const parsePrice = (p: CatalogProductDto): number | undefined => {
+  const cur = p.salesPrice?.current;
+  const whole = Number(cur?.wholeNumber);
+  if (!cur?.wholeNumber || Number.isNaN(whole)) return undefined;
+  const decimals = Number(`0.${cur.decimals ?? "0"}`);
+  return (
+    Math.round((whole + (Number.isNaN(decimals) ? 0 : decimals)) * 100) / 100
+  );
+};
+
 const toCatalogProduct = (p: CatalogProductDto): CatalogProduct => ({
   articleNumber: p.id,
   name: p.name,
@@ -134,6 +149,7 @@ const toCatalogProduct = (p: CatalogProductDto): CatalogProduct => ({
   measure: p.itemMeasureReferenceText ?? "",
   image: p.mainImageUrl,
   url: p.pipUrl,
+  price: parsePrice(p),
 });
 
 /** Searches the full IKEA catalog; each hit is flattened with its variants (colours etc.). */

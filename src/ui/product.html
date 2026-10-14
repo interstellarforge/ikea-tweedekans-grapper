@@ -48,6 +48,7 @@
         initShell,
         empty,
         countryTag,
+        addToList,
       } = App;
       initShell("");
       const article = location.pathname.split("/").pop();
@@ -168,6 +169,12 @@
           render();
         };
 
+        const toList = el("button", {
+          className: "secondary",
+          textContent: "Op lijst",
+          onclick: () => addToList(p),
+        });
+
         // One row per (filiaal, prijs, meting) instead of one per offer.
         const hist = new Map();
         for (const h of p.history) {
@@ -234,6 +241,7 @@
                 "div",
                 { className: "row" },
                 follow,
+                toList,
                 p.url
                   ? el("a", {
                       href: p.url,
