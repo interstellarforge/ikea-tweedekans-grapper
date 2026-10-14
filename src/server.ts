@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   createServer,
@@ -43,8 +44,30 @@ import {
   removeWatchItem,
 } from "./watchlist.ts";
 
-const uiFile = (name: string): string =>
+const readUi = (name: string): string =>
   readFileSync(new URL(`./ui/${name}`, import.meta.url), "utf8");
+
+/** Content hash of the shared assets; appended to asset URLs so proxies/browsers never serve stale copies. */
+const ASSET_VERSION = createHash("sha256")
+  .update(readUi("app.js"))
+  .update(readUi("app.css"))
+  .digest("hex")
+  .slice(0, 12);
+
+const uiFile = (name: string): string => {
+  const content = readUi(name);
+  return name.endsWith(".html")
+    ? content
+        .replace(
+          'src="/assets/app.js"',
+          `src="/assets/app.js?v=${ASSET_VERSION}"`,
+        )
+        .replace(
+          'href="/assets/app.css"',
+          `href="/assets/app.css?v=${ASSET_VERSION}"`,
+        )
+    : content;
+};
 
 const PAGES: Record<string, string> = {
   "/watchlist": "watchlist.html",
