@@ -18,6 +18,8 @@ export type EmailSettings = {
 export type Settings = {
   pollIntervalMin: number;
   ntfyUrl: string;
+  /** Public base URL of this app (no trailing slash); used for deep links in notifications. */
+  appUrl: string;
   email: EmailSettings;
 };
 
@@ -29,12 +31,14 @@ export type PublicSettings = Omit<Settings, "email"> & {
 export type SettingsInput = {
   pollIntervalMin?: number;
   ntfyUrl?: string;
+  appUrl?: string;
   email?: Partial<EmailSettings>;
 };
 
 const defaults = (): Settings => ({
   pollIntervalMin: config.pollIntervalMin,
   ntfyUrl: config.ntfyUrl ?? "",
+  appUrl: process.env["APP_URL"] ?? "",
   email: {
     enabled: false,
     host: "",
@@ -59,6 +63,7 @@ export function getSettings(db: DatabaseSync): Settings {
   return {
     pollIntervalMin: interval > 0 ? interval : d.pollIntervalMin,
     ntfyUrl: map.get("ntfyUrl") ?? d.ntfyUrl,
+    appUrl: map.get("appUrl") ?? d.appUrl,
     email: {
       enabled: map.get("email.enabled") === "1",
       host: map.get("email.host") ?? d.email.host,
@@ -102,6 +107,13 @@ export function saveSettings(
       return "ntfy-URL moet met http(s):// beginnen";
     }
     writes.push(["ntfyUrl", url]);
+  }
+  if (input.appUrl !== undefined) {
+    const url = input.appUrl.trim().replace(/\/+$/, "");
+    if (url && !/^https?:\/\/[^\s/]+(\/\S*)?$/.test(url)) {
+      return "App-URL moet er zo uitzien: https://tweedekans.example.nl";
+    }
+    writes.push(["appUrl", url]);
   }
   const e = input.email;
   if (e) {

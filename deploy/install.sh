@@ -9,6 +9,7 @@ APP_DIR=${APP_DIR:-/opt/ikea-tweedekans-grapper}
 DATA_DIR=${DATA_DIR:-/var/lib/$NAME}
 ENV_FILE=${ENV_FILE:-/etc/$NAME.env}
 UNIT_FILE=${UNIT_FILE:-/etc/systemd/system/$NAME.service}
+NODE_DIR=${NODE_DIR:-/opt/$NAME-node}
 SERVICE_USER=${SERVICE_USER:-ikea}
 SKIP_SYSTEM=${SKIP_SYSTEM:-0} # 1 = only copy files/config (testing)
 SRC_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -26,11 +27,50 @@ if [[ ${1:-} == --uninstall ]]; then
   exit 0
 fi
 
-command -v node >/dev/null || die "Node.js ontbreekt (>= 22.18 nodig, bijv. via https://nodejs.org of nvm)"
-NODE_BIN=$(command -v node)
-node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)' \
-  || die "Node.js $(node -v) is te oud, minimaal 22.18 nodig"
+node_ok() {
+  "$1" -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)' 2>/dev/null
+}
+
+# Downloads Node.js 24 (checksum-verified) into $NODE_DIR, leaving the system Node untouched.
+install_private_node() {
+  for tool in curl tar xz sha256sum; do
+    command -v "$tool" >/dev/null || die "'$tool' ontbreekt (nodig om Node.js te installeren)"
+  done
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=x64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    armv7l) arch=armv7l ;;
+    *) die "onbekende CPU-architectuur: $(uname -m)" ;;
+  esac
+  local base=https://nodejs.org/dist/latest-v24.x tmp file sum
+  tmp=$(mktemp -d)
+  curl -fsSL "$base/SHASUMS256.txt" -o "$tmp/SHASUMS256.txt"
+  file=$(awk -v a="linux-$arch.tar.xz" '$2 ~ a"$" {print $2}' "$tmp/SHASUMS256.txt" | head -1)
+  [[ -n $file ]] || die "geen Node.js-download gevonden voor linux-$arch"
+  echo "==> Node.js downloaden: $file"
+  curl -fsSL "$base/$file" -o "$tmp/$file"
+  sum=$(awk -v f="$file" '$2 == f {print $1}' "$tmp/SHASUMS256.txt")
+  echo "$sum  $tmp/$file" | sha256sum -c --status || die "checksum van $file klopt niet"
+  rm -rf "$NODE_DIR"
+  mkdir -p "$NODE_DIR"
+  tar -xJf "$tmp/$file" -C "$NODE_DIR" --strip-components=1
+  rm -rf "$tmp"
+}
+
+if command -v node >/dev/null && node_ok node; then
+  NODE_BIN=$(command -v node)
+elif [[ -x $NODE_DIR/bin/node ]] && node_ok "$NODE_DIR/bin/node"; then
+  NODE_BIN=$NODE_DIR/bin/node
+else
+  have=$(command -v node >/dev/null && node -v || echo "geen")
+  echo "==> Node.js $have is niet geschikt (>= 22.18 nodig); installeer Node.js 24 in $NODE_DIR"
+  install_private_node
+  NODE_BIN=$NODE_DIR/bin/node
+fi
+export PATH="$(dirname "$NODE_BIN"):$PATH"
 command -v npm >/dev/null || die "npm ontbreekt"
+echo "==> Node.js: $NODE_BIN ($("$NODE_BIN" -v))"
 
 echo "==> App kopiëren naar $APP_DIR"
 mkdir -p "$APP_DIR" "$DATA_DIR"

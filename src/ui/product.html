@@ -44,6 +44,7 @@
         chip,
         tagChip,
         groupOffers,
+        ikeaOfferUrl,
         initShell,
         empty,
       } = App;
@@ -97,6 +98,16 @@
                 el("span", { className: "meta", textContent: "–" }),
             ),
             el("td", { textContent: ago(g.firstSeen) }),
+            el(
+              "td",
+              {},
+              el("a", {
+                href: ikeaOfferUrl(g.storeName, g.offerNumber),
+                target: "_blank",
+                rel: "noopener",
+                textContent: "Bekijk bij IKEA ↗",
+              }),
+            ),
           ),
         );
 
@@ -117,6 +128,7 @@
                     "Staat",
                     "Prijs t.o.v. laagste",
                     "Sinds",
+                    "",
                   ]),
                   el("tbody", {}, ...offerRows(groups)),
                 ),

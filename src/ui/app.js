@@ -42,6 +42,18 @@ const App = (() => {
 
   const OFFERS_URL = "https://www.ikea.com/nl/nl/second-hand/buy-from-ikea/";
 
+  /** Deep link to one offer on IKEA's tweedekanshoek page. */
+  const ikeaOfferUrl = (storeName, offerNumber) => {
+    const slug = storeName
+      .toLowerCase()
+      .replace(/ikea /g, "")
+      .trim()
+      .replace(/\//g, "")
+      .replace(/-/g, "")
+      .replace(/\s+/g, "+");
+    return `${OFFERS_URL}#/${slug}/${offerNumber}`;
+  };
+
   const chip = (text, kind = "") =>
     el("span", { className: `chip ${kind}`, textContent: text });
 
@@ -241,6 +253,7 @@ const App = (() => {
     chip,
     tagChip,
     insightChips,
+    ikeaOfferUrl,
     groupOffers,
     offerCard,
     initShell,

@@ -124,6 +124,21 @@
           <span id="emailMsg" class="hint"></span>
         </div>
 
+        <h3>Links in meldingen</h3>
+        <div class="field">
+          <label for="appUrl">Publieke URL van deze app</label>
+          <input
+            type="url"
+            id="appUrl"
+            placeholder="https://tweedekans.example.nl"
+          />
+        </div>
+        <p class="hint">
+          Tikken op een melding opent hiermee direct het product, en de knop
+          "Meldingen" opent de meldingenpagina. Gebruik het adres waarmee je
+          telefoon deze app bereikt.
+        </p>
+
         <h3>Push (ntfy)</h3>
         <div class="field">
           <label for="ntfy">ntfy-URL</label>
@@ -220,6 +235,7 @@
         const s = await send("/api/settings", "PUT", {
           pollIntervalMin: Number($("interval").value),
           ntfyUrl: $("ntfy").value,
+          appUrl: $("appUrl").value,
           email: emailPayload(),
         });
         $("password").value = "";
@@ -312,6 +328,7 @@
         const s = await api("/api/settings");
         $("interval").value = s.pollIntervalMin;
         $("ntfy").value = s.ntfyUrl;
+        $("appUrl").value = s.appUrl || location.origin;
         const e = s.email;
         $("mailEnabled").checked = e.enabled;
         $("host").value = e.host;

@@ -27,7 +27,7 @@ import {
   fetchStores,
   searchCatalog,
 } from "./ikea-client.ts";
-import { sendEmail, sendNtfy } from "./notify.ts";
+import { alertLinks, sendEmail, sendNtfy } from "./notify.ts";
 import { pollAll, pollStatus } from "./poller.ts";
 import {
   getSettings,
@@ -216,6 +216,7 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
         input.pollIntervalMin = body["pollIntervalMin"];
       }
       if (typeof body["ntfyUrl"] === "string") input.ntfyUrl = body["ntfyUrl"];
+      if (typeof body["appUrl"] === "string") input.appUrl = body["appUrl"];
       const e = body["email"];
       if (typeof e === "object" && e !== null) {
         const m = e as Record<string, unknown>;
@@ -249,7 +250,8 @@ export function createApp(db: DatabaseSync, auth: Auth): Server {
           await sendNtfy(
             settings.ntfyUrl,
             "Tweedekans: testmelding",
-            "ntfy werkt.",
+            "ntfy werkt. Tik om de meldingenpagina te openen.",
+            alertLinks(settings.appUrl),
           );
         }
         send(res, 200, { ok: true });

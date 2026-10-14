@@ -297,3 +297,10 @@ td {
 .group-title:first-child {
   margin-top: 0;
 }
+a.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  text-decoration: none;
+}

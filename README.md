@@ -19,7 +19,7 @@ Env: `PORT` (8080), `HOST` (0.0.0.0), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `IKEA
 Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, installeert de dependency, maakt gebruiker `ikea`,
 `/etc/ikea-tweedekans.env` (met gegenereerd wachtwoord en sleutel), de systemd-unit, en start de service.
 Opnieuw uitvoeren = updaten (config en data blijven). Verwijderen: `sudo ./deploy/install.sh --uninstall`.
-Vereist Node.js >= 22.18 en npm. Logs: `journalctl -u ikea-tweedekans -f`.
+Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.js 24 (checksum-geverifieerd) in `/opt/ikea-tweedekans-node`, zonder de systeem-Node aan te passen (nodig: curl, tar, xz). Logs: `journalctl -u ikea-tweedekans -f`.
 
 ## Pages
 

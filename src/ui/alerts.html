@@ -35,6 +35,7 @@
               <th>Prijs</th>
               <th>Prijsvergelijking</th>
               <th>Verzonden via</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -82,6 +83,16 @@
           el("td", {}, el("strong", { textContent: money(a.price) })),
           el("td", { textContent: a.note || "–" }),
           el("td", {}, deliveryCell(a)),
+          el(
+            "td",
+            {},
+            el("a", {
+              href: App.ikeaOfferUrl(a.storeName, a.offerNumber),
+              target: "_blank",
+              rel: "noopener",
+              textContent: "IKEA ↗",
+            }),
+          ),
         );
 
       async function load(append = false) {
@@ -99,7 +110,7 @@
             el(
               "tr",
               {},
-              el("td", { colSpan: 6 }, empty("Nog geen meldingen.")),
+              el("td", { colSpan: 7 }, empty("Nog geen meldingen.")),
             ),
           );
       }

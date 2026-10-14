@@ -11,7 +11,10 @@ const OFFERS_URL = `https://www.ikea.com/${config.country}/${config.language}/se
 
 const euro = (n: number): string => `€${n.toFixed(2).replace(".", ",")}`;
 const ascii = (s: string): string =>
-  s.normalize("NFD").replace(/[^\x20-\x7e]/g, "");
+  s
+    .replace(/€\s?/g, "EUR ")
+    .normalize("NFD")
+    .replace(/[^\x20-\x7e]/g, "");
 
 export function tagText(tag: PriceTag | undefined): string {
   if (!tag) return "";
@@ -25,14 +28,72 @@ export function tagText(tag: PriceTag | undefined): string {
 const headline = (a: Alert): string =>
   `${a.title} ligt in ${a.storeName} voor ${euro(a.price)}!`;
 
+export type NtfyLinks = {
+  /** Opened when the notification itself is tapped. */
+  click: string;
+  /** Action buttons under the notification (max 3 in ntfy). */
+  actions: { label: string; url: string }[];
+};
+
+/** Normalised store slug as used in IKEA's own as-is URLs (e.g. "IKEA Den Bosch" -> "den+bosch"). */
+export const storeSlug = (storeName: string): string =>
+  storeName
+    .toLowerCase()
+    .replace(/ikea /g, "")
+    .trim()
+    .replace(/\//g, "")
+    .replace(/-/g, "")
+    .replace(/\s+/g, "+");
+
+/** Deep link to one offer on IKEA's tweedekanshoek page. */
+export const ikeaOfferUrl = (storeName: string, offerNumber: string): string =>
+  `${OFFERS_URL}#/${storeSlug(storeName)}/${offerNumber}`;
+
+/** Tap target and buttons for an alert; the in-app buttons need the public app URL. */
+export function alertLinks(
+  appUrl: string,
+  offer?: { storeName: string; offerNumber: string; articleNumber: string },
+): NtfyLinks {
+  const click = offer
+    ? ikeaOfferUrl(offer.storeName, offer.offerNumber)
+    : appUrl
+      ? `${appUrl}/alerts`
+      : OFFERS_URL;
+  if (!appUrl) return { click, actions: [] };
+  return {
+    click,
+    actions: [
+      { label: "Meldingen", url: `${appUrl}/alerts` },
+      ...(offer
+        ? [
+            {
+              label: "Product",
+              url: `${appUrl}/product/${offer.articleNumber}`,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 export async function sendNtfy(
   ntfyUrl: string,
   title: string,
   body: string,
+  links: NtfyLinks = { click: OFFERS_URL, actions: [] },
 ): Promise<void> {
+  const actions = links.actions
+    .slice(0, 3)
+    .map((a) => `view, ${ascii(a.label)}, ${a.url}`)
+    .join("; ");
   const res = await fetch(ntfyUrl, {
     method: "POST",
-    headers: { Title: ascii(title), Click: OFFERS_URL, Tags: "shopping_cart" },
+    headers: {
+      Title: ascii(title),
+      Click: links.click,
+      Tags: "shopping_cart",
+      ...(actions ? { Actions: actions } : {}),
+    },
     body,
     signal: AbortSignal.timeout(10_000),
   });
@@ -68,13 +129,14 @@ export async function notifyAlert(
   db: DatabaseSync,
   alert: Alert,
 ): Promise<string> {
-  const { ntfyUrl, email } = getSettings(db);
+  const { ntfyUrl, email, appUrl } = getSettings(db);
+  const links = alertLinks(appUrl, alert);
   const body = `${alert.description} voor ${euro(alert.price)}${alert.note ? ` — ${alert.note}` : ""}`;
   const jobs: [string, Promise<void>][] = [];
   if (ntfyUrl) {
     jobs.push([
       "ntfy",
-      sendNtfy(ntfyUrl, `Tweedekans: ${headline(alert)}`, body),
+      sendNtfy(ntfyUrl, `Tweedekans: ${headline(alert)}`, body, links),
     ]);
   }
   if (email.enabled) {
@@ -83,7 +145,7 @@ export async function notifyAlert(
       sendEmail(
         email,
         `Tweedekans: ${headline(alert)}`,
-        `${headline(alert)}\n\n${body}\nArtikel ${alert.articleNumber} · aanbieding ${alert.offerNumber}\n\n${OFFERS_URL}\n`,
+        `${headline(alert)}\n\n${body}\nArtikel ${alert.articleNumber} · aanbieding ${alert.offerNumber}\n\nBekijk bij IKEA: ${links.click}${appUrl ? `\nProduct in de app: ${appUrl}/product/${alert.articleNumber}\nAlle meldingen: ${appUrl}/alerts` : ""}\n`,
       ),
     ]);
   }
