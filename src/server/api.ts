@@ -3,16 +3,20 @@ import { z } from "zod";
 import { issueSession, SESSION_COOKIE, SESSION_TTL_MS } from "./auth.ts";
 import { config } from "./config.ts";
 import type { Ctx, Db } from "./db.ts";
+import { authenticateDevice } from "./devices.ts";
+import { clientIp } from "./ips.ts";
 import { runtime } from "./runtime.ts";
 import { userFromCookieHeader } from "./session.ts";
 import { getUserSettings, type UserSettings } from "./settings.ts";
-import { getPasswordHash, type User } from "./users.ts";
+import { getPasswordHash, touchSeen, type User } from "./users.ts";
 
 export type ApiContext = {
   request: Request;
   url: URL;
   db: Db;
   user: User;
+  /** Set when the request was made with a device token (mobile app). */
+  deviceId: number | undefined;
   ctx: Ctx;
   settings: UserSettings;
   params: Record<string, string>;
@@ -59,12 +63,25 @@ export const sessionCookie = (
 ): string =>
   `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(maxAgeSeconds)}${isSecure(request) ? "; Secure" : ""}`;
 
-export const clientIp = (request: Request): string =>
-  request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+export { clientIp } from "./ips.ts";
 
-/** The signed-in, active user behind this request, if any. */
-export const currentUser = (request: Request): User | undefined =>
-  userFromCookieHeader(request.headers.get("cookie") ?? undefined);
+const BEARER = /^Bearer\s+(\S+)$/i;
+
+/**
+ * The signed-in, active user behind this request: a device token (mobile app, `Authorization:
+ * Bearer`) or the browser session cookie.
+ */
+export function currentUser(
+  request: Request,
+): { user: User; deviceId: number | undefined } | undefined {
+  const bearer = BEARER.exec(request.headers.get("authorization") ?? "")?.[1];
+  if (bearer) {
+    const found = authenticateDevice(runtime().db, bearer);
+    return found ? { user: found.user, deviceId: found.deviceId } : undefined;
+  }
+  const user = userFromCookieHeader(request.headers.get("cookie") ?? undefined);
+  return user ? { user, deviceId: undefined } : undefined;
+}
 
 export function newSessionCookie(request: Request, user: User): string {
   const { db, secret } = runtime();
@@ -113,12 +130,14 @@ export function authed(
 ): (request: Request, route: RouteContext) => Promise<Response> {
   return async (request, route) => {
     try {
-      const user = currentUser(request);
-      if (!user) return reply({ error: "Niet ingelogd" }, 401);
+      const found = currentUser(request);
+      if (!found) return reply({ error: "Niet ingelogd" }, 401);
+      const { user, deviceId } = found;
       if (options.admin === true && user.role !== "admin") {
         return reply({ error: "Alleen voor beheerders" }, 403);
       }
       const { db } = runtime();
+      touchSeen(db, user.id, clientIp(request));
       const settings = getUserSettings(db, user.id);
       let cookie: string | undefined;
       const result = await handler({
@@ -126,6 +145,7 @@ export function authed(
         url: new URL(request.url),
         db,
         user,
+        deviceId,
         ctx: { userId: user.id, countries: settings.countries },
         settings,
         params: await route.params,

@@ -15,6 +15,7 @@ const bodySchema = z.object({
       ntfy: z.boolean().optional(),
       email: z.boolean().optional(),
       homeAssistant: z.boolean().optional(),
+      app: z.boolean().optional(),
     })
     .optional(),
   smtp: z

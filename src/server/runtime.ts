@@ -3,6 +3,7 @@ import { config } from "./config.ts";
 import { type Db, openDb } from "./db.ts";
 import { startPolling } from "./poller.ts";
 import { deriveKey } from "./secrets.ts";
+import { purgeAccessLog } from "./stats.ts";
 import { countUsers, createUser } from "./users.ts";
 
 type Runtime = {
@@ -10,7 +11,10 @@ type Runtime = {
   secret: Buffer;
   limiter: LoginLimiter;
   stopPolling: (() => void) | undefined;
+  purgeTimer: NodeJS.Timeout | undefined;
 };
+
+const PURGE_INTERVAL_MS = 3_600_000;
 
 // Next.js may evaluate route modules in separate module graphs; a global keeps one DB handle.
 const holder = globalThis as { __tweedekanshoek?: Runtime };
@@ -29,6 +33,7 @@ function create(): Runtime {
     secret: deriveKey("session"),
     limiter: new LoginLimiter(),
     stopPolling: undefined,
+    purgeTimer: undefined,
   };
 }
 
@@ -41,4 +46,10 @@ export function runtime(): Runtime {
 export function startBackgroundJobs(): void {
   const rt = runtime();
   rt.stopPolling ??= startPolling(rt.db);
+  rt.purgeTimer ??= (() => {
+    purgeAccessLog(rt.db);
+    return setInterval(() => {
+      purgeAccessLog(rt.db);
+    }, PURGE_INTERVAL_MS).unref();
+  })();
 }

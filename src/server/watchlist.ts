@@ -7,6 +7,8 @@ export type WatchItem = CatalogProduct & {
   /** Manual quantity (used when the article is on no shopping list). */
   quantity: number;
   bought: number;
+  /** Pieces reserved in the IKEA app: not bought yet, but no longer needed for trips. */
+  reserved: number;
   /** Pieces still needed: from shopping lists when listed there, else the manual quantity. */
   needed: number;
   /** Shopping lists this article is on, with the pieces still needed per list. */
@@ -71,7 +73,7 @@ export function listWatchItems(
   const rows = db
     .prepare(
       `SELECT w.article_number AS articleNumber, w.name, w.type_name AS typeName, w.measure,
-              w.image, w.url, w.added_at AS addedAt, w.quantity, w.bought,
+              w.image, w.url, w.added_at AS addedAt, w.quantity, w.bought, w.reserved,
               (SELECT COUNT(*) FROM offers o JOIN stores s ON s.store_id = o.store_id
                  WHERE o.article_number = w.article_number AND o.active = 1
                    AND s.country IN (${marks})) AS availableNow,
@@ -120,6 +122,21 @@ export function setBought(
   db.prepare(
     "UPDATE watch_items SET bought = MAX(0, MIN(quantity, ?)) WHERE user_id = ? AND article_number = ?",
   ).run(Math.round(bought), userId, articleNumber);
+}
+
+/** Sets the reserved count, within what is still left to buy. */
+export function setReserved(
+  db: Db,
+  userId: number,
+  articleNumber: string,
+  reserved: number,
+): void {
+  db.prepare(
+    `UPDATE watch_items SET reserved = MAX(0, MIN(?, COALESCE(
+       (SELECT remaining FROM watch_need n WHERE n.user_id = watch_items.user_id
+          AND n.article_number = watch_items.article_number), 0)))
+     WHERE user_id = ? AND article_number = ?`,
+  ).run(Math.round(reserved), userId, articleNumber);
 }
 
 /** Ticks off units of watchlist-only items; never goes beyond the quantity needed. */

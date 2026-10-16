@@ -6,6 +6,13 @@ export const config = {
   country: process.env["IKEA_COUNTRY"] ?? "nl",
   language: process.env["IKEA_LANGUAGE"] ?? "nl",
   /** Public URL of this app (deep links in notifications), no trailing slash. */
+  /**
+   * Reverse proxies in front of the app that append to `x-forwarded-for` (1 = one proxy such as
+   * Nginx Proxy Manager, 2 = e.g. Cloudflare + NPM). 0 = no proxy: the header is not trusted.
+   */
+  trustedProxyHops: Number(process.env["TRUSTED_PROXY_HOPS"] ?? 1),
+  /** Firebase service account (JSON string or path) used to send push notifications to the app. */
+  fcmServiceAccount: (process.env["FCM_SERVICE_ACCOUNT"] ?? "").trim(),
   appUrl: (process.env["APP_URL"] ?? "").replace(/\/+$/, ""),
   /** Base URL of the ntfy server; every user gets a personal topic below it. */
   ntfyBaseUrl: (process.env["NTFY_BASE_URL"] ?? "").replace(/\/+$/, ""),

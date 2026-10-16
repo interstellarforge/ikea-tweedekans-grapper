@@ -65,6 +65,16 @@ function WatchCard({
       quantity,
     }).then(onChanged);
   };
+  const reserve = (reserved: number) => {
+    void send(`/api/watchlist/${item.articleNumber}/reserved`, "PUT", {
+      reserved,
+    }).then(onChanged);
+  };
+  const collect = () => {
+    void send(`/api/watchlist/${item.articleNumber}/reserved`, "POST").then(
+      onChanged,
+    );
+  };
 
   return (
     <div className="card wcard">
@@ -114,7 +124,9 @@ function WatchCard({
             <Chip kind={item.needed > 0 ? "info" : "good"}>
               {item.needed > 0
                 ? `Nog nodig: ${String(item.needed)}`
-                : "Alles gekocht"}
+                : item.reserved > 0
+                  ? "Alles gereserveerd"
+                  : "Alles gekocht"}
             </Chip>
             {item.lists.map((l) => (
               <Chip
@@ -123,16 +135,44 @@ function WatchCard({
             ))}
           </div>
         )}
+        {item.reserved > 0 ? (
+          <div className="chips">
+            <Chip kind="info">{`Gereserveerd: ${String(item.reserved)}`}</Chip>
+            <button type="button" className="secondary mini" onClick={collect}>
+              <IconLabel name="check">Opgehaald</IconLabel>
+            </button>
+            <button
+              type="button"
+              className="secondary mini"
+              onClick={() => {
+                reserve(0);
+              }}
+            >
+              Vrijgeven
+            </button>
+          </div>
+        ) : null}
         {item.needed > 0 ? (
-          <button
-            type="button"
-            className="secondary mini"
-            onClick={() => {
-              onBuy(item);
-            }}
-          >
-            <IconLabel name="check">Gekocht</IconLabel>
-          </button>
+          <div className="chips">
+            <button
+              type="button"
+              className="secondary mini"
+              onClick={() => {
+                reserve(item.reserved + 1);
+              }}
+            >
+              Gereserveerd in IKEA-app
+            </button>
+            <button
+              type="button"
+              className="secondary mini"
+              onClick={() => {
+                onBuy(item);
+              }}
+            >
+              <IconLabel name="check">Gekocht</IconLabel>
+            </button>
+          </div>
         ) : null}
       </div>
     </div>

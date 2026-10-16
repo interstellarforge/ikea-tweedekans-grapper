@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { useApiData } from "@/hooks/useApiData.ts";
 import { errorMessage, send } from "@/lib/api-client.ts";
+import { dateTime } from "@/lib/format.ts";
+import type { Device } from "@/server/devices.ts";
 
 import type { SettingsDraft, SettingsView } from "./SettingsPage.tsx";
 
@@ -93,8 +96,12 @@ export function NotificationsTab({
         : draft.haTargets.filter((t) => t !== name),
     });
   };
+  const devices = useApiData<{ devices: Device[] }>("/api/devices");
   const noneVisible =
-    !ch.ntfy.visible && !ch.email.visible && !ch.homeAssistant.visible;
+    !ch.ntfy.visible &&
+    !ch.email.visible &&
+    !ch.homeAssistant.visible &&
+    !ch.app.visible;
 
   return (
     <div>
@@ -102,6 +109,76 @@ export function NotificationsTab({
         <p className="hint">
           De beheerder heeft op dit moment geen meldingstypes ingeschakeld.
         </p>
+      ) : null}
+
+      {ch.app.visible ? (
+        <details className="channel" open>
+          <summary>
+            App (push) <State on={draft.notify.app && ch.app.configured} />
+          </summary>
+          <div className="body">
+            <div className="field">
+              <label htmlFor="appOn">Meldingen in de Android-app</label>
+              <span>
+                <input
+                  type="checkbox"
+                  id="appOn"
+                  checked={draft.notify.app}
+                  onChange={(event) => {
+                    patch({
+                      notify: { ...draft.notify, app: event.target.checked },
+                    });
+                  }}
+                />
+                <label htmlFor="appOn">Ingeschakeld</label>
+              </span>
+            </div>
+            <p className="hint">
+              Log in met je e-mailadres en wachtwoord in de app. Apparaten die
+              ingelogd zijn staan hieronder; verwijder een apparaat om het uit
+              te loggen.
+            </p>
+            {(devices.data?.devices ?? []).map((d) => (
+              <div className="row" key={d.id}>
+                <span>
+                  <strong>{d.name}</strong>
+                  <span className="meta">{` · laatst gebruikt ${dateTime(d.lastUsed)}${d.pushEnabled ? " · meldingen aan" : ""}`}</span>
+                </span>
+                <button
+                  type="button"
+                  className="secondary mini"
+                  onClick={() => {
+                    void send(`/api/devices/${String(d.id)}`, "DELETE").then(
+                      devices.reload,
+                    );
+                  }}
+                >
+                  Uitloggen
+                </button>
+              </div>
+            ))}
+            {devices.data?.devices.length === 0 ? (
+              <p className="hint">Nog geen apparaten.</p>
+            ) : null}
+            {ch.app.configured ? (
+              <div className="row">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => void test("app", "app")}
+                >
+                  Testmelding versturen
+                </button>
+                <Message flash={flash["app"] ?? NONE} />
+              </div>
+            ) : (
+              <p className="hint">
+                Meldingen werken zodra de beheerder FCM heeft ingesteld en je de
+                app hebt geopend.
+              </p>
+            )}
+          </div>
+        </details>
       ) : null}
 
       {ch.ntfy.visible ? (

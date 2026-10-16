@@ -74,3 +74,32 @@
     margin-top: 8px;
   }
 }
+.admin-page h3 {
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
+.admin-page .hour-bars {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 90px;
+}
+.admin-page .hour-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  text-align: center;
+}
+.admin-page .hour-bar span {
+  display: block;
+  background: var(--info);
+  border-radius: 2px 2px 0 0;
+  min-height: 1px;
+}
+.admin-page .hour-bar small {
+  font-size: 10px;
+  color: var(--muted);
+  height: 12px;
+}

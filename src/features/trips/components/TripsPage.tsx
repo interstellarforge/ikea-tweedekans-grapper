@@ -178,7 +178,10 @@ function DoneButton({
       onClick={() => {
         setState({ busy: true, error: "" });
         void send("/api/list/purchase", "POST", { items: units })
-          .then(onDone)
+          .then(() => {
+            setState({ busy: false, error: "" });
+            onDone();
+          })
           .catch((e: unknown) => {
             setState({ busy: false, error: errorMessage(e) });
           });

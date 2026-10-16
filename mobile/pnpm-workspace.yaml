@@ -1,0 +1,6 @@
+savePrefix: ""
+# Expo publishes its SDK packages in lockstep; these two were released <24h before install and
+# are required by the pinned SDK 57 packages. Remove once they are past minimumReleaseAge.
+minimumReleaseAgeExclude:
+  - "@expo/metro-runtime"
+  - "@expo/cli"

@@ -12,6 +12,7 @@ const CHANNEL_FIELDS = [
   { key: "ntfy", label: "Push (ntfy)" },
   { key: "email", label: "E-mail" },
   { key: "homeAssistant", label: "Home Assistant" },
+  { key: "app", label: "App (push)" },
 ] as const;
 
 type Smtp = {

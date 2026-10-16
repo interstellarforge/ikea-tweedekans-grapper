@@ -4,3 +4,10 @@ data
 .next
 next-env.d.ts
 *.tsbuildinfo
+mobile/node_modules
+mobile/.expo
+mobile/dist
+mobile/android
+mobile/ios
+mobile/google-services.json
+mobile/*.keystore

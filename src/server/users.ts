@@ -152,6 +152,8 @@ export function setPassword(db: Db, id: number, password: string): void {
     hashPassword(password),
     id,
   );
+  // Device tokens are not bound to the password; a password change signs every device out.
+  db.prepare("DELETE FROM device_tokens WHERE user_id = ?").run(id);
 }
 
 function adminCount(db: Db): number {
@@ -218,4 +220,19 @@ export function deleteUser(db: Db, id: number): string | undefined {
     throw error;
   }
   return undefined;
+}
+
+const SEEN_THROTTLE_MS = 60_000;
+
+/** Last activity and IP of a user; written at most once a minute. */
+export function touchSeen(
+  db: Db,
+  id: number,
+  ip: string,
+  now = Date.now(),
+): void {
+  db.prepare(
+    `UPDATE users SET last_seen = ?, last_ip = ?
+      WHERE id = ? AND (last_seen IS NULL OR last_seen < ?)`,
+  ).run(now, ip, id, now - SEEN_THROTTLE_MS);
 }

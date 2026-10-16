@@ -8,6 +8,7 @@ import {
   reply,
 } from "@/server/api.ts";
 import { config } from "@/server/config.ts";
+import { ipVerdict } from "@/server/ips.ts";
 import { runtime } from "@/server/runtime.ts";
 import { getGlobalSettings } from "@/server/settings.ts";
 import {
@@ -24,7 +25,7 @@ const MIN_PASSWORD = 8;
 export const POST = open(async (request, db) => {
   const { limiter } = runtime();
   const ip = clientIp(request);
-  if (limiter.isLocked(ip)) {
+  if (ipVerdict(db, ip) !== "allow" && limiter.isLocked(ip)) {
     throw new HttpError(429, "Te veel pogingen, probeer het later opnieuw");
   }
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));

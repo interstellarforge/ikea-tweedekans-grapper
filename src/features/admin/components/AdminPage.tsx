@@ -7,12 +7,20 @@ import { useHashTab } from "@/hooks/useHashTab.ts";
 import { FetchTab } from "./FetchTab.tsx";
 import { NotificationTypesTab } from "./NotificationTypesTab.tsx";
 import { StatsTab } from "./StatsTab.tsx";
+import { TrafficTab } from "./TrafficTab.tsx";
 import { UsersTab } from "./UsersTab.tsx";
 
-const TABS = ["statistieken", "gebruikers", "meldingen", "ophalen"] as const;
+const TABS = [
+  "statistieken",
+  "verkeer",
+  "gebruikers",
+  "meldingen",
+  "ophalen",
+] as const;
 
 const LABELS: Record<(typeof TABS)[number], string> = {
   statistieken: "Statistieken",
+  verkeer: "Verkeer & IP's",
   gebruikers: "Gebruikers",
   meldingen: "Meldingstypes",
   ophalen: "Ophalen & status",
@@ -31,6 +39,7 @@ export function AdminPage({ currentUserId }: { currentUserId: number }) {
         ))}
       </nav>
       {tab === "statistieken" ? <StatsTab /> : null}
+      {tab === "verkeer" ? <TrafficTab /> : null}
       {tab === "gebruikers" ? <UsersTab currentUserId={currentUserId} /> : null}
       {tab === "meldingen" ? <NotificationTypesTab /> : null}
       {tab === "ophalen" ? <FetchTab /> : null}

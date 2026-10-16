@@ -3,6 +3,7 @@ import { expect, test } from "vitest";
 import { openDb, syncStoreOffers, upsertStores } from "./db.ts";
 import {
   addListItem,
+  collectReserved,
   createList,
   getLists,
   ownsItem,
@@ -11,7 +12,13 @@ import {
   recordPieces,
   setItemWatched,
 } from "./lists.ts";
-import { isWatched, listWatchItems } from "./watchlist.ts";
+import {
+  addWatchItem,
+  isWatched,
+  listWatchItems,
+  setQuantity,
+  setReserved,
+} from "./watchlist.ts";
 
 const product = (articleNumber: string, normalPrice?: number) => ({
   articleNumber,
@@ -130,4 +137,26 @@ test("lists, items and purchases belong to one user only", () => {
   );
 
   expect(getLists(db, 1, NL)[0]?.items[0]?.bought).toBe(1);
+});
+
+test("reserved pieces drop out of what is needed until collected or released", () => {
+  const db = openDb(":memory:");
+  addWatchItem(db, 1, product("70277981"), 1);
+  setQuantity(db, 1, "70277981", 3);
+  setReserved(db, 1, "70277981", 2);
+  expect(listWatchItems(db, 1, NL)[0]).toMatchObject({
+    needed: 1,
+    reserved: 2,
+  });
+
+  setReserved(db, 1, "70277981", 9); // clamped to what is left to buy
+  expect(listWatchItems(db, 1, NL)[0]?.reserved).toBe(3);
+
+  setReserved(db, 1, "70277981", 2);
+  collectReserved(db, 1, "70277981", 5);
+  expect(listWatchItems(db, 1, NL)[0]).toMatchObject({
+    needed: 1,
+    reserved: 0,
+    bought: 2,
+  });
 });

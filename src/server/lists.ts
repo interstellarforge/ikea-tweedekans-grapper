@@ -275,6 +275,32 @@ export function purchaseByArticle(
   }
 }
 
+/** Reserved pieces were picked up: they count as bought, the reservation ends. */
+export function collectReserved(
+  db: Db,
+  userId: number,
+  articleNumber: string,
+  now: number,
+): void {
+  const row = db
+    .prepare(
+      "SELECT reserved FROM watch_items WHERE user_id = ? AND article_number = ?",
+    )
+    .get(userId, articleNumber) as { reserved: number } | undefined;
+  if (!row || row.reserved < 1) return;
+  db.transaction(() => {
+    purchaseByArticle(
+      db,
+      userId,
+      [{ articleNumber, count: row.reserved }],
+      now,
+    );
+    db.prepare(
+      "UPDATE watch_items SET reserved = 0 WHERE user_id = ? AND article_number = ?",
+    ).run(userId, articleNumber);
+  })();
+}
+
 export function setItemWatched(
   db: Db,
   userId: number,

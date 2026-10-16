@@ -52,6 +52,7 @@ test("admin controls which notification types exist", () => {
     ntfy: true,
     email: true,
     homeAssistant: true,
+    app: true,
   });
 
   saveGlobalSettings(db, { channels: { email: false } });
@@ -60,6 +61,7 @@ test("admin controls which notification types exist", () => {
     ntfy: true,
     email: false,
     homeAssistant: true,
+    app: true,
   });
   expect(getGlobalSettings(db).registrationOpen).toBe(true);
 

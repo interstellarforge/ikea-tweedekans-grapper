@@ -1,0 +1,47 @@
+{
+  "name": "tweedekanshoek-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "format": "prettier --check ."
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@tanstack/react-query": "5.104.2",
+    "expo": "57.0.27",
+    "expo-constants": "~57.0.22",
+    "expo-device": "~57.0.2",
+    "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
+    "expo-keep-awake": "~57.0.2",
+    "expo-linking": "~57.0.13",
+    "expo-notifications": "~57.0.23",
+    "expo-router": "57.0.26",
+    "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.10",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.2"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@eslint-react/eslint-plugin": "5.26.5",
+    "@eslint/js": "9.39.5",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/react": "19.2.2",
+    "eslint": "9.39.5",
+    "eslint-plugin-simple-import-sort": "14.0.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2"
+  }
+}

@@ -19,6 +19,7 @@ export type ChannelFlags = {
   ntfy: boolean;
   email: boolean;
   homeAssistant: boolean;
+  app: boolean;
 };
 
 export type GlobalSettings = {
@@ -47,6 +48,7 @@ const ALL_CHANNELS: ChannelFlags = {
   ntfy: true,
   email: true,
   homeAssistant: true,
+  app: true,
 };
 
 function rawMap(
@@ -86,6 +88,7 @@ export function getGlobalSettings(db: Db): GlobalSettings {
       ntfy: channels.ntfy ?? ALL_CHANNELS.ntfy,
       email: channels.email ?? ALL_CHANNELS.email,
       homeAssistant: channels.homeAssistant ?? ALL_CHANNELS.homeAssistant,
+      app: channels.app ?? ALL_CHANNELS.app,
     },
     smtp: {
       host: map.get("email.host") ?? "",
@@ -232,7 +235,7 @@ const userDefaults = (): UserSettings => ({
   hourlyRate: 0,
   maxTripMinutes: 0,
   routeAllStores: true,
-  notify: { ntfy: true, email: false, homeAssistant: false },
+  notify: { ntfy: true, email: false, homeAssistant: false, app: true },
   homeAssistant: { baseUrl: "", token: "", targets: [] },
 });
 
@@ -290,6 +293,7 @@ export function getUserSettings(db: Db, userId: number): UserSettings {
       ntfy: flag("notify.ntfy", d.notify.ntfy),
       email: flag("notify.email", d.notify.email),
       homeAssistant: flag("notify.ha", d.notify.homeAssistant),
+      app: flag("notify.app", d.notify.app),
     },
     homeAssistant: {
       baseUrl: map.get("ha.baseUrl") ?? d.homeAssistant.baseUrl,
@@ -376,6 +380,7 @@ export function saveUserSettings(
     if (n.homeAssistant !== undefined) {
       writes.push(["notify.ha", n.homeAssistant ? "1" : "0"]);
     }
+    if (n.app !== undefined) writes.push(["notify.app", n.app ? "1" : "0"]);
   }
   const ha = input.homeAssistant;
   if (ha) {

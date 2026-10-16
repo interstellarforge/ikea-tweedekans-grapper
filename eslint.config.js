@@ -9,7 +9,16 @@ import simpleImportSort from "eslint-plugin-simple-import-sort";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  { ignores: [".next", "data", "node_modules", "next-env.d.ts", "public"] },
+  {
+    ignores: [
+      ".next",
+      "data",
+      "node_modules",
+      "next-env.d.ts",
+      "public",
+      "mobile",
+    ],
+  },
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,

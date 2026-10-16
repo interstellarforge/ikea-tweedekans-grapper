@@ -17,6 +17,10 @@ services:
       POLL_INTERVAL_MIN: ${POLL_INTERVAL_MIN:-15}
       # Optional: 64 hex chars (openssl rand -hex 32). Default: generated and stored in the data volume.
       SECRET_KEY: ${SECRET_KEY:-}
+      # Firebase service account (JSON string or path) for push notifications to the Android app.
+      FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      # Number of trusted reverse proxies appending to X-Forwarded-For (IP rules, login lockout).
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
       TZ: Europe/Amsterdam
     volumes:
       - tweedekans-data:/data

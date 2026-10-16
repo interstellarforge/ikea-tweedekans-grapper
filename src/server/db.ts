@@ -3,8 +3,10 @@ import { dirname } from "node:path";
 
 import Database from "better-sqlite3";
 
+import { ensureDeviceSchema } from "./devices.ts";
 import type { IkeaOffer, Store } from "./ikea-client.ts";
 import { type PriceTag, priceTag } from "./insights.ts";
+import { ensureIpSchema } from "./ips.ts";
 import { ensureStatsSchema } from "./stats.ts";
 
 export type StoredOffer = IkeaOffer & {
@@ -237,6 +239,8 @@ export function openDb(path: string): Db {
   migrateWatchItemsToList(db);
   migrateToMultiUser(db);
   ensureStatsSchema(db);
+  ensureIpSchema(db);
+  ensureDeviceSchema(db);
   return db;
 }
 
@@ -343,20 +347,29 @@ function migrateToMultiUser(db: Db): void {
     `);
   }
 
-  // Pieces still needed per watched article of one user: derived from that user's shopping lists
-  // when the article is on one, otherwise the manual quantity of the watchlist item.
+  if (!cols("watch_items").includes("reserved")) {
+    db.exec(
+      "ALTER TABLE watch_items ADD COLUMN reserved INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+  // Pieces still to buy per watched article of one user (`remaining`): derived from that user's
+  // shopping lists when the article is on one, otherwise the manual quantity of the watchlist
+  // item. `needed` excludes pieces reserved in the IKEA app (those are off the table for trips).
   db.exec(`
     CREATE VIEW watch_need AS
-    SELECT w.user_id AS user_id, w.article_number AS article_number,
-      CASE WHEN EXISTS (
-             SELECT 1 FROM list_items li JOIN lists l ON l.id = li.list_id
-             WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
-        THEN (SELECT COALESCE(SUM(MAX(0, li.quantity - COALESCE(
-                (SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0))), 0)
-              FROM list_items li JOIN lists l ON l.id = li.list_id
-              WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
-        ELSE MAX(0, w.quantity - w.bought) END AS needed
-    FROM watch_items w;
+    SELECT user_id, article_number, remaining, MAX(0, remaining - reserved) AS needed
+    FROM (
+      SELECT w.user_id AS user_id, w.article_number AS article_number, w.reserved AS reserved,
+        CASE WHEN EXISTS (
+               SELECT 1 FROM list_items li JOIN lists l ON l.id = li.list_id
+               WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
+          THEN (SELECT COALESCE(SUM(MAX(0, li.quantity - COALESCE(
+                  (SELECT SUM(p.quantity) FROM purchases p WHERE p.list_item_id = li.id), 0))), 0)
+                FROM list_items li JOIN lists l ON l.id = li.list_id
+                WHERE l.user_id = w.user_id AND li.article_number = w.article_number)
+          ELSE MAX(0, w.quantity - w.bought) END AS remaining
+      FROM watch_items w
+    );
   `);
 }
 

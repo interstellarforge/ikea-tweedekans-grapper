@@ -1,1 +1,4 @@
+mobile/node_modules
+.next
 pnpm-lock.yaml
+mobile/pnpm-lock.yaml

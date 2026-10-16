@@ -5,6 +5,7 @@ const CHANNELS: Record<string, ChannelName> = {
   ntfy: "ntfy",
   email: "email",
   ha: "homeAssistant",
+  app: "app",
 };
 
 export const POST = authed(async ({ db, user, ctx, params }) => {

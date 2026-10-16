@@ -4,7 +4,9 @@ import { config } from "./config.ts";
 import { COUNTRIES, isCountry } from "./countries.ts";
 import type { Db } from "./db.ts";
 import type { Ctx } from "./db.ts";
+import { dropPushToken, pushTokensOf } from "./devices.ts";
 import type { PriceTag } from "./insights.ts";
+import { pushConfigured, type PushMessage, sendPush } from "./push.ts";
 import {
   getGlobalSettings,
   getUserSettings,
@@ -93,6 +95,24 @@ export function alertLinks(
         : []),
     ],
   };
+}
+
+/** Pushes to every registered device of a user; dead tokens are forgotten. */
+async function sendAppPush(
+  db: Db,
+  userId: number,
+  message: PushMessage,
+): Promise<void> {
+  const tokens = pushTokensOf(db, userId);
+  const results = await Promise.allSettled(
+    tokens.map(async (token) => {
+      if ((await sendPush(token, message)) === "unregistered") {
+        dropPushToken(db, token);
+      }
+    }),
+  );
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason as Error;
 }
 
 export async function sendNtfy(
@@ -234,7 +254,7 @@ export function ntfyUrlFor(user: Pick<User, "ntfyToken">): string | undefined {
     : undefined;
 }
 
-export type ChannelName = "ntfy" | "email" | "homeAssistant";
+export type ChannelName = "ntfy" | "email" | "homeAssistant" | "app";
 
 /** What can actually be used for this user: visible (admin) + wanted (user) + configured. */
 export function channelStatus(
@@ -257,6 +277,11 @@ export function channelStatus(
       enabled: u.notify.email,
       configured: g.smtp.host !== "",
     },
+    app: {
+      visible: g.channels.app,
+      enabled: u.notify.app,
+      configured: pushConfigured() && pushTokensOf(db, user.id).length > 0,
+    },
     homeAssistant: {
       visible: g.channels.homeAssistant,
       enabled: u.notify.homeAssistant,
@@ -271,6 +296,10 @@ export function channelStatus(
 export type Message = {
   title: string;
   body: string;
+  /** Extra string data for the app (e.g. articleNumber for a deep link). */
+  data?: Record<string, string>;
+  /** Android notification channel in the app; defaults to "offers". */
+  channelId?: string;
   links: NtfyLinks;
   /** Longer text for e-mail; defaults to title + body + link. */
   emailText?: string;
@@ -315,6 +344,17 @@ ${msg.body}
 ${msg.links.click}
 `,
       ),
+    ]);
+  }
+  if (wants("app")) {
+    jobs.push([
+      "app",
+      sendAppPush(db, user.id, {
+        title: msg.title,
+        body: msg.body,
+        data: { click: msg.links.click, ...msg.data },
+        channelId: msg.channelId ?? "offers",
+      }),
     ]);
   }
   if (wants("homeAssistant")) {
@@ -421,6 +461,12 @@ export async function notifyAlert(
   return deliver(db, user, {
     title,
     body,
+    data: {
+      articleNumber: alert.articleNumber,
+      offerNumber: alert.offerNumber,
+      storeName: alert.storeName,
+    },
+    channelId: alert.note.includes("laagste") ? "price-drops" : "offers",
     links,
     emailText: `${headline(alert)}\n\n${body}\nArtikel ${alert.articleNumber} · aanbieding ${alert.offerNumber}\n\nBekijk bij IKEA: ${links.click}${appUrl ? `\nProduct in de app: ${appUrl}/product/${alert.articleNumber}\nAlle meldingen: ${appUrl}/alerts` : ""}\n`,
   });

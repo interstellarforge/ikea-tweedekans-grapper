@@ -35,7 +35,12 @@ export type SettingsDraft = {
   hourlyRate: string;
   maxTripMinutes: string;
   routeAllStores: boolean;
-  notify: { ntfy: boolean; email: boolean; homeAssistant: boolean };
+  notify: {
+    ntfy: boolean;
+    email: boolean;
+    homeAssistant: boolean;
+    app: boolean;
+  };
   haUrl: string;
   haToken: string;
   haTargets: string[];
