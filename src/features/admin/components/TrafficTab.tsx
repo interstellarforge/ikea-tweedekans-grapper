@@ -14,6 +14,14 @@ type TrafficResponse = { traffic: Traffic; rules: IpRule[]; yourIp: string };
 const numberFormat = new Intl.NumberFormat("nl-NL");
 const n = (value: number): string => numberFormat.format(value);
 
+const CLIENT_LABEL: Record<string, string> = {
+  app: "de app",
+  bot: "bot/script",
+  mobile: "mobiel",
+  desktop: "desktop",
+  other: "overig",
+};
+
 const VERDICT_LABEL: Record<IpVerdict, string> = {
   none: "",
   allow: "toegestaan",
@@ -163,6 +171,23 @@ export function TrafficTab() {
               </tbody>
             </table>
           </div>
+          <h3>Bezoekers</h3>
+          <div className="stat-grid">
+            <div className="stat">
+              <strong>{n(traffic.visitors.newIps24h)}</strong>
+              <span>Nieuwe IP&apos;s (24 uur)</span>
+            </div>
+            <div className="stat">
+              <strong>{n(traffic.visitors.returningIps24h)}</strong>
+              <span>Terugkerende IP&apos;s (24 uur)</span>
+            </div>
+            {traffic.visitors.clients.map((c) => (
+              <div className="stat" key={c.client}>
+                <strong>{n(c.ips)}</strong>
+                <span>{`IP's met ${CLIENT_LABEL[c.client] ?? c.client} (7 dagen)`}</span>
+              </div>
+            ))}
+          </div>
           <h3>Populairste paden (7 dagen)</h3>
           <div className="table-scroll">
             <table className="users">
@@ -185,6 +210,52 @@ export function TrafficTab() {
                     <td>{u.email}</td>
                     <td>{dateTime(u.lastSeen)}</td>
                     <td>{u.lastIp ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+      <details className="channel" open>
+        <summary>
+          Beveiligingsmeldingen{" "}
+          <span className="state">{String(traffic.alerts.length)}</span>
+        </summary>
+        <div className="body">
+          <p className="hint">
+            Je krijgt een melding (via je eigen meldingskanalen) bij 10+
+            mislukte logins in 15 minuten, 5+ afgewezen verzoeken door de rate
+            limit in 10 minuten, of een IP dat 50+ API-verzoeken per uur doet
+            zonder ooit een pagina te openen. Max. 1 melding per soort en IP per
+            uur.
+          </p>
+          <div className="field">
+            <label htmlFor="alertsOn">Meldingen</label>
+            <span>
+              <input
+                type="checkbox"
+                id="alertsOn"
+                checked={traffic.alertsEnabled}
+                onChange={(e) => {
+                  void run(
+                    send("/api/admin/traffic", "PUT", {
+                      alertsEnabled: e.target.checked,
+                    }),
+                  );
+                }}
+              />
+              <label htmlFor="alertsOn">Stuur mij beveiligingsmeldingen</label>
+            </span>
+          </div>
+          <div className="table-scroll">
+            <table className="users">
+              <tbody>
+                {traffic.alerts.map((a) => (
+                  <tr key={a.id}>
+                    <td>{dateTime(a.ts)}</td>
+                    <td>{a.ip}</td>
+                    <td>{a.detail}</td>
                   </tr>
                 ))}
               </tbody>
@@ -222,6 +293,9 @@ export function TrafficTab() {
                           {VERDICT_LABEL[r.verdict]}
                         </span>
                       )}
+                      {r.apiOnly ? (
+                        <span className="role off">alleen API</span>
+                      ) : null}
                     </td>
                     <td>{n(r.requests)}</td>
                     <td>{n(r.failedLogins)}</td>

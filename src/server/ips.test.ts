@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { checkAdminAlerts } from "./admin-alerts.ts";
 
 import { openDb } from "./db.ts";
 import {
@@ -8,6 +9,7 @@ import {
   ipVerdict,
   normalizeCidr,
 } from "./ips.ts";
+import { RateLimiter } from "./ips.ts";
 import { computeTraffic, logAccess, purgeAccessLog } from "./stats.ts";
 
 test("cidr: v4/v6 ranges match, mapped v4 and invalid input are handled", () => {
@@ -58,9 +60,9 @@ test("ip rules: allow beats block, expired rules are ignored, self-block refused
 test("traffic: raw rows older than retention roll up per day and are dropped", () => {
   const db = openDb(":memory:");
   logAccess(db, "9.9.9.9", "/api/product/123", "req");
-  db.prepare("INSERT INTO access_log VALUES (?, '8.8.8.8', '/x', 'req')").run(
-    Date.now() - 90 * 86_400_000,
-  );
+  db.prepare(
+    "INSERT INTO access_log (ts, ip, path, event) VALUES (?, '8.8.8.8', '/x', 'req')",
+  ).run(Date.now() - 90 * 86_400_000);
   purgeAccessLog(db);
   const t = computeTraffic(db);
   expect(t.paths[0]?.path).toBe("/api/product/:id");
@@ -68,4 +70,27 @@ test("traffic: raw rows older than retention roll up per day and are dropped", (
   expect(db.prepare("SELECT COUNT(*) AS n FROM access_log").get()).toEqual({
     n: 1,
   });
+});
+
+test("rate limiter: over the limit within a minute, free again after", () => {
+  const limiter = new RateLimiter();
+  expect([1, 2, 3].map(() => limiter.exceeded("a", 2, 1000))).toEqual([
+    false,
+    false,
+    true,
+  ]);
+  expect(limiter.exceeded("a", 2, 62_000)).toBe(false);
+});
+
+test("admin alerts: api-only IP is flagged once, allow-listed IP never", async () => {
+  const db = openDb(":memory:");
+  for (const ip of ["3.3.3.3", "4.4.4.4"]) {
+    for (let i = 0; i < 60; i++) logAccess(db, ip, "/api/catalog", "req");
+  }
+  addIpRule(db, { cidr: "4.4.4.4", kind: "allow", note: "" }, "1.1.1.1");
+  await checkAdminAlerts(db);
+  await checkAdminAlerts(db);
+  expect(db.prepare("SELECT ip, kind FROM admin_alerts").all()).toEqual([
+    { ip: "3.3.3.3", kind: "api_only" },
+  ]);
 });

@@ -31,7 +31,15 @@ export function ensureIpSchema(db: Db): void {
       ts INTEGER NOT NULL,
       ip TEXT NOT NULL,
       path TEXT NOT NULL,
-      event TEXT NOT NULL
+      event TEXT NOT NULL,
+      ua TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS admin_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      detail TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS access_log_ts ON access_log (ts);
     CREATE INDEX IF NOT EXISTS access_log_ip ON access_log (ip, ts);
@@ -44,6 +52,12 @@ export function ensureIpSchema(db: Db): void {
       blocked INTEGER NOT NULL
     );
   `);
+  const logCols = (
+    db.prepare("PRAGMA table_info(access_log)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!logCols.includes("ua")) {
+    db.exec("ALTER TABLE access_log ADD COLUMN ua TEXT NOT NULL DEFAULT ''");
+  }
   const cols = (
     db.prepare("PRAGMA table_info(users)").all() as { name: string }[]
   ).map((c) => c.name);
@@ -235,4 +249,38 @@ export function addIpRule(
 
 export function deleteIpRule(db: Db, id: number): void {
   db.prepare("DELETE FROM ip_rules WHERE id = ?").run(id);
+}
+
+/** Sliding one-minute window per key, in memory (resets on restart). */
+export class RateLimiter {
+  private hits = new Map<string, number[]>();
+
+  /** Counts this request; true when it is over `limit` for the last minute. */
+  exceeded(key: string, limit: number, now = Date.now()): boolean {
+    const recent = (this.hits.get(key) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length <= limit * 2) recent.push(now);
+    this.hits.set(key, recent);
+    if (this.hits.size > 10_000) {
+      for (const [k, list] of this.hits) {
+        if (now - (list.at(-1) ?? 0) >= 60_000) this.hits.delete(k);
+      }
+    }
+    return recent.length > limit;
+  }
+}
+
+export type UaClass = "app" | "bot" | "mobile" | "desktop" | "other";
+
+/** Coarse client type; the raw user agent is never stored. */
+export function classifyUa(request: Request): UaClass {
+  if (request.headers.has("authorization")) return "app";
+  const ua = request.headers.get("user-agent") ?? "";
+  if (
+    /bot|crawl|spider|curl|wget|python|go-http|java|scrapy|http-client/i.test(
+      ua,
+    )
+  )
+    return "bot";
+  if (/mobile|android|iphone|ipad/i.test(ua)) return "mobile";
+  return /mozilla/i.test(ua) ? "desktop" : "other";
 }

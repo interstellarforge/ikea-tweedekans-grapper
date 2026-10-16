@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { authed } from "@/server/api.ts";
+import { setAdminAlertsEnabled } from "@/server/admin-alerts.ts";
+import { authed, ok } from "@/server/api.ts";
 import { clientIp, listIpRules } from "@/server/ips.ts";
 import {
   computeTraffic,
@@ -8,7 +9,10 @@ import {
   setRetentionDays,
 } from "@/server/stats.ts";
 
-const bodySchema = z.object({ retentionDays: z.number() });
+const bodySchema = z.object({
+  retentionDays: z.number().optional(),
+  alertsEnabled: z.boolean().optional(),
+});
 
 export const GET = authed(
   ({ db, request }) => ({
@@ -21,12 +25,15 @@ export const GET = authed(
 
 export const PUT = authed(
   async ({ db, body }) => {
-    const retentionDays = setRetentionDays(
-      db,
-      (await body(bodySchema)).retentionDays,
-    );
-    purgeAccessLog(db);
-    return { retentionDays };
+    const changes = await body(bodySchema);
+    if (changes.alertsEnabled !== undefined) {
+      setAdminAlertsEnabled(db, changes.alertsEnabled);
+    }
+    if (changes.retentionDays !== undefined) {
+      setRetentionDays(db, changes.retentionDays);
+      purgeAccessLog(db);
+    }
+    return ok;
   },
   { admin: true },
 );

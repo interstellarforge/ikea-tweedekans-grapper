@@ -1,8 +1,10 @@
 import { LoginLimiter } from "./auth.ts";
 import { config } from "./config.ts";
 import { type Db, openDb } from "./db.ts";
+import { RateLimiter } from "./ips.ts";
 import { startPolling } from "./poller.ts";
 import { deriveKey } from "./secrets.ts";
+import { checkAdminAlerts } from "./admin-alerts.ts";
 import { purgeAccessLog } from "./stats.ts";
 import { countUsers, createUser } from "./users.ts";
 
@@ -10,11 +12,13 @@ type Runtime = {
   db: Db;
   secret: Buffer;
   limiter: LoginLimiter;
+  rateLimiter: RateLimiter;
   stopPolling: (() => void) | undefined;
   purgeTimer: NodeJS.Timeout | undefined;
 };
 
-const PURGE_INTERVAL_MS = 3_600_000;
+const ALERT_INTERVAL_MS = 60_000;
+const PURGE_EVERY_TICKS = 60;
 
 // Next.js may evaluate route modules in separate module graphs; a global keeps one DB handle.
 const holder = globalThis as { __tweedekanshoek?: Runtime };
@@ -32,6 +36,7 @@ function create(): Runtime {
     db,
     secret: deriveKey("session"),
     limiter: new LoginLimiter(),
+    rateLimiter: new RateLimiter(),
     stopPolling: undefined,
     purgeTimer: undefined,
   };
@@ -48,8 +53,11 @@ export function startBackgroundJobs(): void {
   rt.stopPolling ??= startPolling(rt.db);
   rt.purgeTimer ??= (() => {
     purgeAccessLog(rt.db);
+    let ticks = 0;
     return setInterval(() => {
-      purgeAccessLog(rt.db);
-    }, PURGE_INTERVAL_MS).unref();
+      ticks += 1;
+      if (ticks % PURGE_EVERY_TICKS === 0) purgeAccessLog(rt.db);
+      void checkAdminAlerts(rt.db);
+    }, ALERT_INTERVAL_MS).unref();
   })();
 }

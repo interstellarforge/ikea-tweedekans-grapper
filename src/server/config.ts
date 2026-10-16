@@ -11,6 +11,8 @@ export const config = {
    * Nginx Proxy Manager, 2 = e.g. Cloudflare + NPM). 0 = no proxy: the header is not trusted.
    */
   trustedProxyHops: Number(process.env["TRUSTED_PROXY_HOPS"] ?? 1),
+  /** Max /api requests per IP per minute before answering 429 (0 = off). Allow-listed IPs are exempt. */
+  apiRateLimitPerMin: Number(process.env["API_RATE_LIMIT_PER_MIN"] ?? 300),
   /** Firebase service account (JSON string or path) used to send push notifications to the app. */
   fcmServiceAccount: (process.env["FCM_SERVICE_ACCOUNT"] ?? "").trim(),
   appUrl: (process.env["APP_URL"] ?? "").replace(/\/+$/, ""),

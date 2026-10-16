@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { clientIp, ipVerdict } from "@/server/ips.ts";
+import { config as appConfig } from "@/server/config.ts";
+import { classifyUa, clientIp, ipVerdict } from "@/server/ips.ts";
 import { runtime } from "@/server/runtime.ts";
 import { bump, logAccess } from "@/server/stats.ts";
 
@@ -26,7 +27,7 @@ const isProtected = (path: string): boolean =>
 export function proxy(request: NextRequest): NextResponse {
   const path = request.nextUrl.pathname;
   try {
-    const { db } = runtime();
+    const { db, rateLimiter } = runtime();
     const ip = clientIp(request);
     if (ipVerdict(db, ip) === "block") {
       bump(db, "blocked_requests");
@@ -35,7 +36,20 @@ export function proxy(request: NextRequest): NextResponse {
         ? NextResponse.json({ error: "Toegang geweigerd" }, { status: 403 })
         : new NextResponse("Toegang geweigerd", { status: 403 });
     }
-    logAccess(db, ip, path, "req");
+    const ua = classifyUa(request);
+    if (
+      path.startsWith("/api/") &&
+      appConfig.apiRateLimitPerMin > 0 &&
+      ipVerdict(db, ip) !== "allow" &&
+      rateLimiter.exceeded(ip, appConfig.apiRateLimitPerMin)
+    ) {
+      logAccess(db, ip, path, "limited", ua);
+      return NextResponse.json(
+        { error: "Te veel verzoeken, probeer het zo opnieuw" },
+        { status: 429, headers: { "retry-after": "60" } },
+      );
+    }
+    logAccess(db, ip, path, "req", ua);
   } catch (error) {
     console.error("[proxy]", error);
   }

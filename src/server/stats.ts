@@ -1,4 +1,11 @@
 import type { Db } from "./db.ts";
+import {
+  API_ONLY_MIN_REQUESTS,
+  apiOnlyIps,
+  getAdminAlertsEnabled,
+  listAdminAlerts,
+  type AdminAlert,
+} from "./admin-alerts.ts";
 import { ipVerdict, type IpVerdict } from "./ips.ts";
 
 export type StatFormat = "int" | "eur";
@@ -257,7 +264,8 @@ export function publicStats(db: Db): Stat[] {
 
 // ---- Traffic (raw IP log with retention, rolled up per day afterwards) ----
 
-export type AccessEvent = "req" | "blocked" | "login_ok" | "login_fail";
+export type AccessEvent =
+  "req" | "blocked" | "limited" | "login_ok" | "login_fail";
 
 const DEFAULT_RETENTION_DAYS = 30;
 const MAX_RETENTION_DAYS = 365;
@@ -278,11 +286,12 @@ export function logAccess(
   ip: string,
   path: string,
   event: AccessEvent,
+  ua = "",
 ): void {
   try {
     db.prepare(
-      "INSERT INTO access_log (ts, ip, path, event) VALUES (?, ?, ?, ?)",
-    ).run(Date.now(), ip, normalizePath(path), event);
+      "INSERT INTO access_log (ts, ip, path, event, ua) VALUES (?, ?, ?, ?, ?)",
+    ).run(Date.now(), ip, normalizePath(path), event, ua);
   } catch {
     /* statistics must never break a request */
   }
@@ -363,8 +372,18 @@ export type Traffic = {
     lastSeen: number;
     failedLogins: number;
     blocked: number;
+    apiRequests: number;
+    pageRequests: number;
+    apiOnly: boolean;
     verdict: IpVerdict;
   }[];
+  visitors: {
+    newIps24h: number;
+    returningIps24h: number;
+    clients: { client: string; ips: number }[];
+  };
+  alertsEnabled: boolean;
+  alerts: AdminAlert[];
   users: {
     id: number;
     email: string;
@@ -428,15 +447,22 @@ export function computeTraffic(db: Db, now = Date.now()): Traffic {
     .all() as { h: number; n: number }[]) {
     hours[r.h] = r.n;
   }
+  const apiOnly = new Set(apiOnlyIps(db, since(7), API_ONLY_MIN_REQUESTS));
   const ips = (
     db
       .prepare(
         `SELECT ip, SUM(event = 'req') AS requests, MAX(ts) AS lastSeen,
-                SUM(event = 'login_fail') AS failedLogins, SUM(event = 'blocked') AS blocked
+                SUM(event = 'login_fail') AS failedLogins, SUM(event = 'blocked') AS blocked,
+                SUM(event = 'req' AND path LIKE '/api/%') AS apiRequests,
+                SUM(event = 'req' AND path NOT LIKE '/api/%') AS pageRequests
            FROM access_log WHERE ts >= ? GROUP BY ip ORDER BY requests DESC, lastSeen DESC LIMIT 25`,
       )
-      .all(since(7)) as Omit<Traffic["ips"][number], "verdict">[]
-  ).map((r) => ({ ...r, verdict: ipVerdict(db, r.ip, now) }));
+      .all(since(7)) as Omit<Traffic["ips"][number], "verdict" | "apiOnly">[]
+  ).map((r) => ({
+    ...r,
+    apiOnly: apiOnly.has(r.ip),
+    verdict: ipVerdict(db, r.ip, now),
+  }));
   const users = (
     db
       .prepare(
@@ -479,6 +505,28 @@ export function computeTraffic(db: Db, now = Date.now()): Traffic {
       )
       .all(since(7)) as Traffic["paths"],
     ips,
+    visitors: {
+      newIps24h: scalar(
+        db,
+        `SELECT COUNT(*) AS n FROM (SELECT ip FROM access_log GROUP BY ip HAVING MIN(ts) >= ?)`,
+        since(1),
+      ),
+      returningIps24h: scalar(
+        db,
+        `SELECT COUNT(*) AS n FROM (SELECT ip FROM access_log GROUP BY ip
+          HAVING MIN(ts) < ? AND MAX(ts) >= ?)`,
+        since(1),
+        since(1),
+      ),
+      clients: db
+        .prepare(
+          `SELECT ua AS client, COUNT(DISTINCT ip) AS ips FROM access_log
+            WHERE ua != '' AND ts >= ? GROUP BY ua ORDER BY ips DESC`,
+        )
+        .all(since(7)) as Traffic["visitors"]["clients"],
+    },
+    alertsEnabled: getAdminAlertsEnabled(db),
+    alerts: listAdminAlerts(db),
     users,
   };
 }
