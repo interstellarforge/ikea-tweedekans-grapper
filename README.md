@@ -1,72 +1,160 @@
-# Tweedekanshoek (tweedekanshoek.nl)
+<div align="center">
 
-LAN webpage + service: follow Tweedekanshoek offers in chosen stores, search them, see what's new.
+<img src="public/icon-192.png" alt="Tweedekanshoek logo" width="96" height="96" />
 
-- Data: IKEA's public as-is API (`web-api.ikea.com/circular/circular-asis`), polled for all stores of the enabled countries (NL on by default; BE and DE optional in `/settings`).
-- Stack: Next.js 16 (App Router) + React 19, TypeScript, SQLite via better-sqlite3 (`data/tweedekans.db`, zelfde bestand en schema als voorheen), nodemailer. De JSON-API onder `/api/*` is de interface voor web en een latere mobiele app. De achtergrond-fetcher start via `src/instrumentation.ts`.
+# Tweedekanshoek
 
-## Run
+**Know when your IKEA furniture shows up in the second-chance corner — and whether the drive is worth it.**
 
-    pnpm install
-    pnpm dev          # http://localhost:3000 (ontwikkeling)
-    pnpm build && pnpm start   # productie op PORT (standaard 3000)
+[www.tweedekanshoek.nl](https://www.tweedekanshoek.nl) · Dutch interface · NL · BE · DE
 
-Env: `PORT`, `HOSTNAME` (Next), `DB_PATH`, `POLL_INTERVAL_MIN` (15), `SECRET_KEY` (64 hex; versleutelt tokens en wachtwoorden), `ADMIN_EMAIL` (alleen dit adres mag het eerste account maken), `APP_URL` (publieke URL voor links in meldingen, bijv. `https://tweedekanshoek.nl`), `NTFY_BASE_URL` (ntfy-server; elke gebruiker krijgt een eigen topic daaronder), `IKEA_COUNTRY`/`IKEA_LANGUAGE`/`IKEA_CLIENT_ID`.
+<img src="docs/screenshots/landing.png" alt="Tweedekanshoek landing page" width="860" />
 
-## Linux service (systemd)
+</div>
 
-    sudo ./deploy/install.sh
+> **Unofficial project.** Tweedekanshoek is an independent tool. It is not affiliated with, sponsored by or endorsed by IKEA. Reserving and buying always happens at IKEA itself.
 
-Eén commando: kopieert de app naar `/opt/ikea-tweedekans-grapper`, bouwt de app (`next build`, standalone), maakt gebruiker `ikea`,
-`/etc/ikea-tweedekans.env` (met gegenereerd wachtwoord en sleutel), de systemd-unit, en start de service.
-Opnieuw uitvoeren = updaten (config en data blijven). Voor elke update wordt een consistente back-up van de database gemaakt in `<datamap>/backups/` (de laatste 10 blijven bewaard). Terugzetten: `sudo ./deploy/restore-backup.sh --list` en daarna `sudo ./deploy/restore-backup.sh [bestand]` (zonder bestand: de nieuwste). De huidige database wordt eerst veiliggesteld, dus een herstel is terug te draaien. Verwijderen: `sudo ./deploy/install.sh --uninstall`.
-Is Node.js ontbrekend of te oud (< 22.18), dan installeert het script zelf Node.js 24 (checksum-geverifieerd) in `/opt/ikea-tweedekans-node`, zonder de systeem-Node aan te passen (nodig: curl, tar, xz). Logs: `journalctl -u ikea-tweedekans -f`.
+## Why
 
-## Pages
+IKEA's _Tweedekanshoek_ (second-chance corner: returns, ex-display, buy-backs) is listed **per store**, changes constantly and sells out fast. Finding the one METOD cabinet you need means checking dozens of store pages — and then deciding whether a 90-minute drive saves enough money.
 
-Publiek: `/` (landingspagina; ingelogd → `/watchlist`), `/login`, `/register`, `/healthz`. Ontwerp: IKEA-blauw/geel, Noto Sans (zelf gehost, OFL, `public/fonts`), één designsysteem in `src/app/globals.css` (tokens, zie DESIGN.md) plus kleine feature-stylesheets.
+Tweedekanshoek fetches the offers of **all stores** in the Netherlands, Belgium and Germany, tracks prices over time, tells you the moment something from your list shows up, and calculates whether the trip pays off.
 
-`/product/:articleNumber` (productdetail: alle tweedekansaanbiedingen + prijsgeschiedenis), `/watchlist` (watchlist + meldingen), `/catalog` (zoeken in IKEA-assortiment), `/tweedekans` (menu: Aanbod; zoeken in alle tweedekansaanbiedingen), `/watchlist` (tabs: watchlist + meerdere boodschappenlijsten met importeren, bon en aankopen per stuk), `/profile` (wachtwoord wijzigen), `/admin` (beheer: statistieken [ook selecteerbaar voor de landingspagina], gebruikers, meldingstypes, ophalen & status), `/trips` (ritje-check per filiaal + slimste route langs meerdere filialen), `/alerts` (meldingshistorie), `/settings` (tabs: filialen, ritje-check, meldingen [Home Assistant, ntfy, e-mail], ophalen & status; gevolgde filialen, interval, ntfy, status).
+## Features
 
-Alle filialen worden periodiek opgehaald; per aanbieding worden artikelnummer en prijs bewaard (`price_history`) voor prijsvergelijking.
-Gevolgde filialen bepalen alleen waarvoor meldingen komen.
+### Watchlist and shopping lists
 
-## API
+Put any product from IKEA's full catalogue on your watchlist, or build shopping lists per room (kitchen, wardrobe, bedroom). Import a list from text (`2x 802.045.62`), set quantities, tick pieces off with the price you paid, and get a receipt-style total with how much you saved against the new price.
 
-`GET /api/stores`, `PUT /api/stores/:id/followed`, `GET|PUT /api/settings`, `GET /api/status`, `POST /api/sync`,
-`GET /api/catalog?q=`, `GET|PUT /api/watchlist`, `DELETE /api/watchlist/:articleNumber`,
-`GET /api/trips`, `PUT /api/watchlist/:articleNumber/quantity`, `GET /api/alerts`, `POST /api/alerts/seen`, `GET /api/offers?q=&store=&followed=&newHours=&sort=&limit=&offset=`
+<img src="docs/screenshots/shopping-lists.png" alt="Shopping list with totals, progress and per-line purchases" width="860" />
 
-## ntfy (push) op jupiter
+### Alerts when it appears
 
-`deploy/ntfy/docker-compose.yml` draait een eigen ntfy-server (standaard host-poort 8097, via `NTFY_PORT`).
+Follow the stores you can reach. When a watchlist product lands in a followed store you get a notification that opens the exact offer at IKEA. Choose your channel: **push (ntfy)**, **e-mail**, **Home Assistant**, or the **Android app**. Every alert says how the price compares: _lowest price so far_ or _+€2.50 above the lowest earlier price_.
 
-    cd deploy/ntfy
-    cp .env.example .env   # NTFY_BASE_URL = publieke URL via Nginx Proxy Manager
-    docker compose up -d
+<img src="docs/screenshots/notifications.png" alt="Notification settings: ntfy, e-mail, Home Assistant and app" width="860" />
 
-Nginx Proxy Manager: Proxy Host met scheme `http`, forward host = jupiter, forward port = `NTFY_PORT`,
-**Websockets Support aan** (nodig voor live meldingen), SSL naar keuze.
-Zet daarna in `/settings` van de app de ntfy-URL op `<NTFY_BASE_URL>/tweedekans` en abonneer de ntfy-app op topic `tweedekans`.
+### Browse every offer
 
-## App in Docker
+All second-chance offers of all stores in one searchable list, with filters (store, followed stores, new in the last 24 h / 3 d / 7 d) and sorting (newest, price, biggest discount).
 
-    cp .env.example .env     # APP_PORT (standaard 8090), POLL_INTERVAL_MIN, optioneel SECRET_KEY
-    docker compose up -d --build
+<img src="docs/screenshots/offers.png" alt="Offers overview with filters" width="860" />
 
-Data (SQLite + `secret.key`) staat in het volume `tweedekans-data` (`/data`). UI: `http://<host>:<APP_PORT>/`.
-Draait ntfy op dezelfde host, gebruik dan als ntfy-URL `http://<host>:<NTFY_PORT>/tweedekans`
-(vanuit de container is `localhost` niet de host).
+### Product pages with price history
 
-## Accounts en beveiliging
+Every article has its own page: where it is available now, at what price and condition, how long it has been there, and every price ever measured.
 
-- **Meerdere gebruikers:** account maken met e-mail + wachtwoord. Het eerste account wordt beheerder en neemt eventuele bestaande gegevens (single-user versie) over. Zet `ADMIN_EMAIL` zodat alleen dat adres het eerste account kan maken.
-- **Upgrade vanaf de single-user versie:** zet `ADMIN_EMAIL` en laat `AUTH_PASSWORD` eenmalig staan: daarmee wordt het beheerdersaccount automatisch aangemaakt met je bestaande gegevens. Haal `AUTH_PASSWORD` daarna weg.
-- **Persoonlijke data:** watchlist, lijsten, aankopen, meldingen, gevolgde filialen en instellingen zijn per gebruiker. Aanbiedingen en prijzen zijn gedeeld en worden centraal voor alle filialen opgehaald.
-- **Beheer (`/admin`):** gebruikers beheren (rol, activeren, wachtwoord, verwijderen), meldingstypes aan/uit voor iedereen (uit = onzichtbaar en niet verstuurd), SMTP, ophaalinterval en status.
-- **Meldingen:** ntfy-topic per gebruiker is afgeleid en niet aan te passen; e-mail gaat naar het accountadres via de SMTP van de beheerder; Home Assistant is persoonlijk.
-- Sessiecookie: HttpOnly, SameSite=Lax, 30 dagen, `Secure` achter HTTPS; max. 5 foute logins per IP per 15 min. `/healthz` is publiek.
-- **IP-beheer en verkeer (`/admin#verkeer`):** blokkeer/sta IP's of CIDR-bereiken toe (met reden en optionele verloopdatum; toestaan wint van blokkeren en slaat de login-lockout over). Afgedwongen in `src/proxy.ts` voor alle pagina's en `/api/*` (incl. mobiele endpoints); je kunt je eigen IP niet blokkeren. Ruwe IP-logs worden na 30 dagen (instelbaar) opgeruimd en per dag samengevat.
-- **Rate limiting en meldingen:** `/api/*` is beperkt tot `API_RATE_LIMIT_PER_MIN` (300) verzoeken per IP per minuut (429; allowlist is vrijgesteld; in-memory, per proces); inloggen/registreren heeft daarnaast max. 5 foute pogingen per 15 min. Beheerders krijgen een melding (eigen kanalen) bij veel mislukte logins, rate-limit-hits of IP's die alleen API-calls doen (niet het IP van een gebruiker).
-- **Echt client-IP:** `x-forwarded-for` is door de client te vervalsen. De app neemt daarom het adres `TRUSTED_PROXY_HOPS` plekken van rechts (standaard 1 = één proxy zoals Nginx Proxy Manager, dat het IP achteraan toevoegt; 2 = bijv. Cloudflare + NPM; 0 = geen proxy, header genegeerd en IP onbekend). Zonder proxy ervoor (poort direct open) kan een aanvaller blokkades omzeilen: gebruik dan `APP_BIND=127.0.0.1`.
-- Zet de app achter HTTPS (Nginx Proxy Manager) en bij voorkeur een Access List/IP-beperking als extra laag.
+<img src="docs/screenshots/product.png" alt="Product page with offers per store and price history" width="860" />
+
+### Trip check
+
+The feature that turns a list into a decision. For your postcode, fuel price, consumption, time per store and the value of your time, it calculates per store **and** for multi-store routes whether the trip is worth it: saving against the new price minus fuel minus time. Green means worth it, orange means worth it in money but not in time. Exclude stores you never visit, cap the number of stops and the maximum trip time, open the route in Google Maps, send it to your phone, and tick off what you picked up.
+
+<img src="docs/screenshots/trip-check.png" alt="Trip check with best route, costs and per-store breakdown" width="860" />
+
+### Multi-user, private by design
+
+Anyone can create an account. Watchlists, lists, purchases, alerts and settings are strictly per user; only the offers and prices are shared. An admin area (`/admin`) offers statistics, user management, notification-type switches, SMTP and fetch status, and lets the admin choose which statistics (if any) are shown publicly on the landing page.
+
+<img src="docs/screenshots/admin.png" alt="Admin statistics" width="860" />
+
+### Works on your phone
+
+The whole site is mobile-first, with a hamburger menu and a design system shared with the Android app.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/mobile-landing.png" alt="Landing page on mobile" width="200" /></td>
+    <td><img src="docs/screenshots/mobile-login.png" alt="Login on mobile" width="200" /></td>
+    <td><img src="docs/screenshots/mobile-watchlist.png" alt="Watchlist on mobile" width="200" /></td>
+    <td><img src="docs/screenshots/mobile-trip-check.png" alt="Trip check on mobile" width="200" /></td>
+  </tr>
+</table>
+
+## Android app
+
+A native Android app lives in [`mobile/`](mobile/) (Expo / React Native, Expo Router). It is in internal testing and not on the Play Store yet.
+
+- Lists, products, offers and trip check with a native feel and light/dark theme
+- **Push notifications** via Firebase Cloud Messaging, with separate channels for new offers, price drops and profitable trips
+- **Haptic feedback** on bought/follow actions, steppers and tabs (can be switched off)
+- Deep links: `tweedekanshoek.nl/product/…` and notification taps open the product
+- Per-device login tokens that you can revoke from the website
+
+See [`mobile/README.md`](mobile/README.md) for setup (Firebase, EAS builds).
+
+## How it works
+
+```
+IKEA as-is API ──► poller (all stores, every ~15 min) ──► SQLite
+                                                           │
+        ┌──────────────────────────────────────────────────┤
+        ▼                                                  ▼
+ price history + alerts ──► ntfy / e-mail / Home Assistant / FCM push
+        │
+        ▼
+ Next.js JSON API (/api/*) ──► web app (React) and Android app
+                         └──► trip engine (OSRM routes, PDOK geocoding)
+```
+
+- **Offers** come from IKEA's public as-is API and are refreshed centrally for every store, for everyone.
+- **Prices** are stored per article in a slim history table, which powers the price tags ("lowest so far", "+€x").
+- **Trips** use OSRM for driving distance and time and PDOK for postcode lookups, with a small solver for multi-store routes.
+- **Secrets** (SMTP password, Home Assistant token) are encrypted with AES-256-GCM; passwords use scrypt; sessions are HttpOnly cookies, devices use revocable hashed tokens.
+
+## Tech stack
+
+| Area       | Choice                                                                               |
+| ---------- | ------------------------------------------------------------------------------------ |
+| Web        | Next.js 16 (App Router), React 19, TypeScript (strict)                               |
+| Data       | SQLite via better-sqlite3                                                            |
+| Validation | Zod                                                                                  |
+| Mobile     | Expo SDK 57, React Native, Expo Router, TanStack Query                               |
+| Quality    | ESLint (strict type-checked, React, a11y), Prettier, Vitest                          |
+| Design     | Hand-built design system (IKEA blue/yellow, Noto Sans), see [`DESIGN.md`](DESIGN.md) |
+| Deploy     | Docker, or systemd on Linux (self-hosted behind a reverse proxy)                     |
+
+## Run it yourself
+
+**Docker**
+
+```bash
+cp .env.example .env     # set ADMIN_EMAIL, APP_URL, optional SECRET_KEY
+docker compose up -d --build
+```
+
+**Development**
+
+```bash
+pnpm install
+pnpm dev                 # http://localhost:3000
+pnpm typecheck && pnpm lint && pnpm test
+```
+
+The first account you create becomes the admin (set `ADMIN_EMAIL` to restrict who may create it). Full instructions for Docker, the systemd installer, backups/restore, ntfy and the security model are in [`docs/self-hosting.md`](docs/self-hosting.md) (Dutch).
+
+## Project layout
+
+```
+src/app/          routes, layouts and the JSON API (route handlers)
+src/features/     feature code: lists, catalog, offers, trips, settings, admin, …
+src/components/   shared UI and layout
+src/server/       domain logic, SQLite access, notifications, poller
+mobile/           Android app (Expo)
+deploy/           systemd installer, backup/restore, ntfy compose
+docs/             self-hosting guide and screenshots
+```
+
+## Privacy
+
+Your data is yours: lists, purchases and settings are only visible to your own account, and the app talks to your own server. The Android app never scrapes IKEA; it only uses this server's API. The screenshots in this README use a demo account and show product data from IKEA's public as-is API.
+
+## Disclaimer
+
+IKEA and the names of IKEA products are trademarks of Inter IKEA Systems B.V. This project uses them only to describe the products it tracks. Prices, availability and delivery information come from IKEA's public as-is API and may be out of date; always check at IKEA before you drive.
+
+## License
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may use, modify and self-host it; if you run a modified version as a network service, you must offer its source code to your users under the same license.
+
+The name **Tweedekanshoek**, the logo and the tweedekanshoek.nl domain are not covered by the license and may not be reused for other services. IKEA names and product data remain the property of their owners; the bundled Noto Sans font is licensed under the SIL OFL (`public/fonts/OFL.txt`).
